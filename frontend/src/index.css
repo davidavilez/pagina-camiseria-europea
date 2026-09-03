@@ -45,11 +45,41 @@ body {
 .titulo-principal {
   color: #1e3a8a;
   text-align: center;
-  margin-bottom: 20px;
+  margin: 50px 20px 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
+}
+
+.inicio {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 1px 24px 48px;
+}
+
+.galeria-inicio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.foto-inicio {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(30, 58, 138, 0.14);
+}
+
+@media (max-width: 700px) {
+  .inicio {
+    padding-inline: 16px;
+  }
+
+  .galeria-inicio {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Botones */
