@@ -1,51 +1,67 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { LogOut, Shirt } from 'lucide-react';
+import Auth from './Auth';
 import Operario from './Operario';
 import Gerencia from './Gerencia';
 
-const fotosInicio = [
-  {
-    src: 'https://images.unsplash.com/photo-1603252110481-7ba873bf42ab?auto=format&fit=crop&w=900&q=85',
-    alt: 'Camisa blanca doblada',
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?auto=format&fit=crop&w=900&q=85',
-    alt: 'Camisa azul de vestir',
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=85',
-    alt: 'Telas de distintos colores',
-  },
-];
+const SESSION_KEY = 'inventario-session';
 
-function App() {
+function AppContent() {
+  const [session, setSession] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+    } catch {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+  });
+  const location = useLocation();
+  const navigate = useNavigate();
+  const destinoRol = session?.usuario?.rol === 'gerencia' ? '/dashboard' : '/escaner';
+
+  const iniciarSesion = (datos) => {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(datos));
+    setSession(datos);
+    navigate(datos.usuario.rol === 'gerencia' ? '/dashboard' : '/escaner', { replace: true });
+  };
+
+  const cerrarSesion = () => {
+    localStorage.removeItem(SESSION_KEY);
+    setSession(null);
+    navigate('/', { replace: true });
+  };
+
+  const proteger = (rol, elemento) => {
+    if (!session?.token) return <Navigate to="/" replace state={{ from: location }} />;
+    if (session.usuario?.rol !== rol) return <Navigate to={destinoRol} replace />;
+    return elemento;
+  };
+
   return (
-    <BrowserRouter>
+    <>
       <nav className="navbar">
-        <Link to="/" className="nav-link">Inicio</Link>
-        <Link to="/escaner" className="nav-link">Operario (Escáner)</Link>
-        <Link to="/dashboard" className="nav-link">Gerencia (Dashboard)</Link>
+        <Link to={session ? destinoRol : '/'} className="nav-brand"><Shirt size={20} /> Camisería Europea</Link>
+        {session && <div className="nav-session">
+          <span>{session.usuario.nombre} <small>{session.usuario.rol}</small></span>
+          {session.usuario.rol === 'operario' && <Link to="/escaner" className="nav-link">Escáner</Link>}
+          {session.usuario.rol === 'gerencia' && <Link to="/dashboard" className="nav-link">Inventario</Link>}
+          <button type="button" className="nav-logout" onClick={cerrarSesion} aria-label="Cerrar sesión" title="Cerrar sesión"><LogOut size={18} /></button>
+        </div>}
       </nav>
 
       <Routes>
-        <Route
-          path="/"
-          element={
-            <main className="inicio">
-              <h2 className="titulo-principal">Sistema de Inventario QR</h2>
-              <section className="galeria-inicio" aria-label="Colección de camisería">
-                {fotosInicio.map((foto) => (
-                  <img key={foto.src} className="foto-inicio" src={foto.src} alt={foto.alt} />
-                ))}
-              </section>
-            </main>
-          }
-        />
-        <Route path="/escaner" element={<Operario />} />
-        <Route path="/dashboard" element={<Gerencia />} />
+        <Route path="/" element={session?.token ? <Navigate to={destinoRol} replace /> : <Auth onAuthenticated={iniciarSesion} />} />
+        <Route path="/escaner" element={proteger('operario', <Operario />)} />
+        <Route path="/dashboard" element={proteger('gerencia', <Gerencia />)} />
+        <Route path="*" element={<Navigate to={session?.token ? destinoRol : '/'} replace />} />
       </Routes>
-    </BrowserRouter>
+    </>
   );
+}
+
+function App() {
+  return <BrowserRouter><AppContent /></BrowserRouter>;
 }
 
 export default App;

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
-import axios from 'axios';
+import api from './api';
 
 export default function Operario() {
   const [resultadoQR, setResultadoQR] = useState(null);
@@ -19,7 +19,7 @@ export default function Operario() {
           scanner.clear();
           setResultadoQR(textoDecodificado);
         },
-        (error) => {} 
+        () => {}
       );
 
       return () => {
@@ -37,10 +37,9 @@ export default function Operario() {
     setCargando(true);
     
     try {
-      const respuesta = await axios.post('http://localhost:3000/api/cortes', {
+      const respuesta = await api.post('/cortes', {
         codigo_qr: resultadoQR,
         metros_cortados: parseFloat(metros),
-        operario_id: "Operario_Turno_1"
       });
 
       alert(`✅ ¡Corte exitoso! Nuevo saldo: ${respuesta.data.nuevo_saldo} metros.`);

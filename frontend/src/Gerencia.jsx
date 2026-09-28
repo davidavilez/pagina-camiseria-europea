@@ -1,24 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Database, TrendingDown } from 'lucide-react';
-import axios from 'axios';
+import api from './api';
 
 export default function Gerencia() {
   const [inventario, setInventario] = useState([]);
   const [cargando, setCargando] = useState(true);
 
-  const cargarDatos = async () => {
-    try {
-      const respuesta = await axios.get('http://localhost:3000/api/rollos');
-      setInventario(respuesta.data);
-    } catch (error) {
-      console.error("Error al cargar inventario:", error);
-    } finally {
-      setCargando(false);
-    }
-  };
-
   useEffect(() => {
-    cargarDatos();
+    let activo = true;
+    api.get('/rollos')
+      .then((respuesta) => {
+        if (activo) setInventario(respuesta.data);
+      })
+      .catch((error) => {
+        console.error('Error al cargar inventario:', error);
+      })
+      .finally(() => {
+        if (activo) setCargando(false);
+      });
+
+    return () => {
+      activo = false;
+    };
   }, []);
 
   return (
