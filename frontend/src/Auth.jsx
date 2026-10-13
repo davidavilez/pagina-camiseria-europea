@@ -39,7 +39,7 @@ export default function Auth({ onAuthenticated }) {
         <div className="auth-brand"><Shirt size={25} strokeWidth={1.8} /> <span>CAMISERÍA EUROPEA</span></div>
         <div className="auth-aside-copy">
           <p className="auth-kicker">INVENTARIO · CONTROL · TRAZABILIDAD</p>
-          <h1>Todo el taller,<br />en una sola vista.</h1>
+          <h1>Camiseria Europea,<br />sistema de inventario QR</h1>
           <p>Acceso al inventario y registro de cortes según tu función.</p>
         </div>
         <span className="auth-aside-index">SISTEMA INTERNO / 01</span>

@@ -1,12 +1,4 @@
 /* Importar una fuente moderna y limpia */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-
-body {
-  margin: 0;
-  font-family: 'Inter', system-ui, sans-serif;
-  background-color: #f1f5f9; /* Fondo gris muy suave */
-  color: #334155;
-}
 
 /* Barra de navegación */
 .navbar {
@@ -212,10 +204,7 @@ body {
   min-height: 620px;
   padding: 38px clamp(30px, 6vw, 84px);
   color: #fff;
-  background-color: #174b43;
-  background-image: linear-gradient(135deg, rgba(8, 45, 40, 0.36), rgba(8, 45, 40, 0.04)), url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=1400&q=85');
-  background-position: center;
-  background-size: cover;
+  background-color: #071b9b;
 }
 
 .auth-brand {
