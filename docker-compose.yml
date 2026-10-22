@@ -13,6 +13,8 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Solo se ejecuta cuando el volumen está vacío (primera instalación).
+      - ./Backend/database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
 
 volumes:
   pgdata:
