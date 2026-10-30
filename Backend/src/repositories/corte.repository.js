@@ -43,4 +43,30 @@ const listarAuditoria = async ({ limite }, db = pool) => {
   return rows;
 };
 
-module.exports = { crear, listarAuditoria };
+// Los días del calendario de gerencia se cuentan en hora de Colombia.
+const ZONA_HORARIA = 'America/Bogota';
+
+/** Cortes de un día (YYYY-MM-DD en hora de Colombia), del más temprano al más tarde. */
+const listarPorDia = async ({ fecha }, db = pool) => {
+  const { rows } = await db.query(
+    `SELECT c.id,
+            c.fecha_corte,
+            to_char(c.fecha_corte AT TIME ZONE $2, 'HH24:MI') AS hora,
+            u.id               AS operario_id,
+            u.nombre           AS operario_nombre,
+            r.id               AS rollo_id,
+            r.codigo_sku,
+            r.tipo_tela,
+            r.color,
+            c.metros_cortados
+       FROM cortes c
+       JOIN rollos   r ON r.id = c.rollo_id
+       JOIN usuarios u ON u.id = c.operario_id
+      WHERE (c.fecha_corte AT TIME ZONE $2)::date = $1::date
+      ORDER BY c.fecha_corte ASC, c.id ASC`,
+    [fecha, ZONA_HORARIA]
+  );
+  return rows;
+};
+
+module.exports = { crear, listarAuditoria, listarPorDia };

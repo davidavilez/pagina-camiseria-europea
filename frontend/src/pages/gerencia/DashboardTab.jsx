@@ -5,6 +5,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
 import usePolling from '../../hooks/usePolling';
 import { obtenerConsumo } from '../../api/reportes.api';
 import IndicadorEnVivo from '../../components/IndicadorEnVivo';
+import HistorialPorDia from './HistorialPorDia';
 import { formatearFecha, formatearMetros } from '../../utils/formato';
 
 const RANGOS = [
@@ -224,6 +225,8 @@ export default function DashboardTab() {
           </div>
         </>
       )}
+
+      <HistorialPorDia />
     </>
   );
 }

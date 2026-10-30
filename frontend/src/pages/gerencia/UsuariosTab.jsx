@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Plus, ShieldCheck } from 'lucide-react';
+import { Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import usePolling from '../../hooks/usePolling';
+import useAuth from '../../hooks/useAuth';
 import { listarUsuarios, cambiarEstadoUsuario } from '../../api/usuarios.api';
 import { mensajeDeError } from '../../api/client';
 import Alerta from '../../components/Alerta';
 import IndicadorEnVivo from '../../components/IndicadorEnVivo';
 import NuevoUsuarioModal from './NuevoUsuarioModal';
+import EliminarUsuarioModal from './EliminarUsuarioModal';
 import { formatearFecha } from '../../utils/formato';
 
 const ESTADOS = {
@@ -14,9 +16,14 @@ const ESTADOS = {
   pendiente_aprobacion: { etiqueta: 'Pendiente de aprobación', clase: 'badge--bajo' },
 };
 
+// Cuentas eliminadas que se conservan por tener cortes: el backend les antepone "borrado<id>." al correo.
+const esCuentaBorrada = (usuario) => usuario.estado === 'inactivo' && /^borrado\d+\./.test(usuario.email);
+
 export default function UsuariosTab() {
-  const { datos: usuarios, error, cargando, ultimaActualizacion, recargar } = usePolling(listarUsuarios);
+  const { datos, error, cargando, ultimaActualizacion, recargar } = usePolling(listarUsuarios);
+  const { usuario: sesion } = useAuth();
   const [creando, setCreando] = useState(false);
+  const [porEliminar, setPorEliminar] = useState(null);
   const [aviso, setAviso] = useState('');
   const [errorAccion, setErrorAccion] = useState('');
 
@@ -33,6 +40,15 @@ export default function UsuariosTab() {
     }
   };
 
+  const usuarios = datos?.filter((u) => !esCuentaBorrada(u));
+  const borrados = (datos?.length ?? 0) - (usuarios?.length ?? 0);
+
+  const alEliminar = ({ mensaje }) => {
+    setErrorAccion('');
+    setAviso(mensaje);
+    recargar();
+  };
+
   const alCrear = (usuario) => {
     recargar();
     setAviso(usuario.credenciales_enviadas
@@ -43,7 +59,10 @@ export default function UsuariosTab() {
   return (
     <>
       <div className="barra-herramientas">
-        <p className="barra-titulo">{usuarios ? `${usuarios.length} usuarios registrados` : 'Usuarios'}</p>
+        <p className="barra-titulo">
+          {usuarios ? `${usuarios.length} usuarios registrados` : 'Usuarios'}
+          {borrados > 0 && <span className="tenue"> · {borrados} eliminados con historial conservado</span>}
+        </p>
         <IndicadorEnVivo ultimaActualizacion={ultimaActualizacion} error={error} />
         <button type="button" className="btn btn--primario" onClick={() => { setAviso(''); setCreando(true); }}>
           <Plus size={16} /> Nuevo usuario
@@ -77,21 +96,32 @@ export default function UsuariosTab() {
                     <td data-label="Estado"><span className={`badge ${estado.clase}`}>{estado.etiqueta}</span></td>
                     <td data-label="Creado" className="tenue">{formatearFecha(u.fecha_creacion)}</td>
                     <td data-label="Acciones">
-                      {u.protegido ? (
-                        <span className="cuenta-protegida" title="Cuenta maestra del sistema: no se puede dar de baja.">
-                          <ShieldCheck size={14} /> Cuenta protegida
-                        </span>
-                      ) : u.estado === 'pendiente_aprobacion' ? (
-                        <span className="tenue">Espera al Súper Administrador</span>
-                      ) : (
-                        <button
-                          type="button"
-                          className={`btn btn--compacto ${u.estado === 'activo' ? 'btn--secundario' : 'btn--primario'}`}
-                          onClick={() => alternarEstado(u)}
-                        >
-                          {u.estado === 'activo' ? 'Dar de baja' : 'Activar'}
-                        </button>
-                      )}
+                      <div className="acciones-fila">
+                        {u.protegido ? (
+                          <span className="cuenta-protegida" title="Cuenta maestra del sistema: no se puede dar de baja.">
+                            <ShieldCheck size={14} /> Cuenta protegida
+                          </span>
+                        ) : u.estado === 'pendiente_aprobacion' ? (
+                          <span className="tenue">Espera al Súper Administrador</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className={`btn btn--compacto ${u.estado === 'activo' ? 'btn--secundario' : 'btn--primario'}`}
+                            onClick={() => alternarEstado(u)}
+                          >
+                            {u.estado === 'activo' ? 'Dar de baja' : 'Activar'}
+                          </button>
+                        )}
+                        {!u.protegido && u.id !== sesion?.id && (
+                          <button
+                            type="button"
+                            className="btn btn--compacto btn--peligro"
+                            onClick={() => { setAviso(''); setPorEliminar(u); }}
+                          >
+                            <Trash2 size={14} /> Eliminar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -102,6 +132,9 @@ export default function UsuariosTab() {
       )}
 
       {creando && <NuevoUsuarioModal onCerrar={() => setCreando(false)} onCreado={alCrear} />}
+      {porEliminar && (
+        <EliminarUsuarioModal usuario={porEliminar} onCerrar={() => setPorEliminar(null)} onEliminado={alEliminar} />
+      )}
     </>
   );
 }

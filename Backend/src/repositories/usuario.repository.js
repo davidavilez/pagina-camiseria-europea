@@ -90,6 +90,62 @@ const aprobarPorToken = async (token, db = pool) => {
   return rows[0] ?? null;
 };
 
+/** Bloquea la fila del usuario hasta el fin de la transacción (eliminación). */
+const buscarPorIdParaActualizar = async (id, db = pool) => {
+  const { rows } = await db.query(
+    `SELECT ${COLUMNAS_PUBLICAS} FROM usuarios WHERE id = $1 FOR UPDATE`,
+    [id]
+  );
+  return rows[0] ?? null;
+};
+
+/**
+ * Cuenta los gerentes activos bloqueando sus filas: dos gerentes que se
+ * eliminan entre sí al mismo tiempo no pueden dejar el sistema sin gerencia.
+ */
+const contarGerentesActivos = async (db = pool) => {
+  const { rows } = await db.query(
+    `SELECT id FROM usuarios WHERE rol = 'gerencia' AND estado = 'activo' FOR UPDATE`
+  );
+  return rows.length;
+};
+
+const tieneCortes = async (id, db = pool) => {
+  const { rows } = await db.query(
+    'SELECT EXISTS (SELECT 1 FROM cortes WHERE operario_id = $1) AS tiene',
+    [id]
+  );
+  return rows[0].tiene;
+};
+
+/** DELETE real: solo para usuarios sin historial (la FK de cortes es RESTRICT). */
+const eliminar = async (id, db = pool) => {
+  const { rows } = await db.query(
+    `DELETE FROM usuarios WHERE id = $1 AND email <> $2 RETURNING ${COLUMNAS_PUBLICAS}`,
+    [id, GERENTE_GENERAL_EMAIL]
+  );
+  return rows[0] ?? null;
+};
+
+/**
+ * Borrado lógico de un usuario con cortes: conserva el historial, libera el
+ * correo (prefijo "borrado<id>.") para poder reutilizarlo y bloquea el acceso.
+ * LEFT respeta el límite de VARCHAR(254); el id en el prefijo mantiene la unicidad.
+ */
+const desactivarYLiberarEmail = async (id, db = pool) => {
+  const { rows } = await db.query(
+    `UPDATE usuarios
+        SET email = LEFT('borrado' || id || '.' || email, 254),
+            estado = 'inactivo',
+            aprobacion_token = NULL,
+            aprobacion_notificada_en = NULL
+      WHERE id = $1 AND email <> $2
+      RETURNING ${COLUMNAS_PUBLICAS}`,
+    [id, GERENTE_GENERAL_EMAIL]
+  );
+  return rows[0] ?? null;
+};
+
 module.exports = {
   buscarPorEmail,
   buscarPorId,
@@ -99,4 +155,9 @@ module.exports = {
   reservarNotificacionAprobacion,
   liberarNotificacionAprobacion,
   aprobarPorToken,
+  buscarPorIdParaActualizar,
+  contarGerentesActivos,
+  tieneCortes,
+  eliminar,
+  desactivarYLiberarEmail,
 };

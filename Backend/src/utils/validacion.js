@@ -51,4 +51,20 @@ const opcion = (valor, opciones, campo) => {
   return valor;
 };
 
-module.exports = { texto, email, metros, idEntero, opcion };
+const FECHA_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Fecha de calendario YYYY-MM-DD que además exista (rechaza 2026-02-30). */
+const fecha = (valor, campo = 'fecha') => {
+  const partes = typeof valor === 'string' ? FECHA_REGEX.exec(valor) : null;
+  if (!partes) {
+    throw AppError.badRequest(`El campo "${campo}" debe tener el formato AAAA-MM-DD.`);
+  }
+  const [anio, mes, dia] = partes.slice(1).map(Number);
+  const real = new Date(Date.UTC(anio, mes - 1, dia));
+  if (real.getUTCFullYear() !== anio || real.getUTCMonth() !== mes - 1 || real.getUTCDate() !== dia) {
+    throw AppError.badRequest(`La ${campo} ${valor} no existe en el calendario.`);
+  }
+  return valor;
+};
+
+module.exports = { texto, email, metros, idEntero, opcion, fecha };

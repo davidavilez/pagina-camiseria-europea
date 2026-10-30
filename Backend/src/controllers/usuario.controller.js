@@ -14,6 +14,11 @@ const cambiarEstado = async (req, res) => {
   res.json({ usuario, mensaje: `El estado del usuario ahora es ${usuario.estado}.` });
 };
 
+/** Responde con `accion`: 'eliminado' (DELETE real) o 'desactivado' (tenía cortes). */
+const eliminar = async (req, res) => {
+  res.json(await usuarioService.eliminarUsuario(req.params.id, req.usuario));
+};
+
 /** Se abre desde el correo del Súper Administrador: responde con una página HTML. */
 const aprobar = async (req, res) => {
   const usuario = await usuarioService.aprobarPorToken(req.params.token);
@@ -33,4 +38,4 @@ const aprobar = async (req, res) => {
   }));
 };
 
-module.exports = { listar, crear, cambiarEstado, aprobar };
+module.exports = { listar, crear, cambiarEstado, eliminar, aprobar };

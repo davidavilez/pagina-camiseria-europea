@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { withTransaction } = require('../config/db');
 const usuarioRepository = require('../repositories/usuario.repository');
 const emailService = require('./email.service');
 const { ROLES, ESTADOS_USUARIO, GERENTE_GENERAL_EMAIL } = require('../config/constants');
@@ -76,6 +77,66 @@ const cambiarEstadoUsuario = async (id, estado) => {
   return actualizado;
 };
 
+const ACCIONES_ELIMINACION = Object.freeze({
+  ELIMINADO: 'eliminado',
+  DESACTIVADO: 'desactivado',
+});
+
+/**
+ * Elimina un usuario dentro de una transacción:
+ *  - Sin cortes: DELETE real.
+ *  - Con cortes: el historial no se puede perder (FK RESTRICT), así que se
+ *    desactiva y se libera su correo con el prefijo "borrado<id>.".
+ * Nadie puede eliminarse a sí mismo, ni a la cuenta maestra, ni al último gerente activo.
+ */
+const eliminarUsuario = async (id, solicitante) => {
+  const usuarioId = validar.idEntero(id, 'ID del usuario');
+
+  if (usuarioId === solicitante.id) {
+    throw AppError.forbidden('No puedes eliminar tu propia cuenta.');
+  }
+
+  return withTransaction(async (client) => {
+    const usuario = await usuarioRepository.buscarPorIdParaActualizar(usuarioId, client);
+    if (!usuario) {
+      throw AppError.notFound('El usuario no existe.');
+    }
+    if (esGerenteGeneral(usuario)) {
+      throw AppError.forbidden('Acción prohibida: No se puede eliminar al Gerente General del sistema.');
+    }
+
+    if (usuario.rol === ROLES.GERENCIA && usuario.estado === ESTADOS_USUARIO.ACTIVO) {
+      const gerentesActivos = await usuarioRepository.contarGerentesActivos(client);
+      if (gerentesActivos <= 1) {
+        throw AppError.conflict('No se puede eliminar al último usuario de gerencia activo.');
+      }
+    }
+
+    if (!(await usuarioRepository.tieneCortes(usuarioId, client))) {
+      const eliminado = await usuarioRepository.eliminar(usuarioId, client);
+      if (!eliminado) {
+        throw AppError.conflict('No se pudo eliminar el usuario.');
+      }
+      return {
+        accion: ACCIONES_ELIMINACION.ELIMINADO,
+        usuario: eliminado,
+        mensaje: `El usuario ${eliminado.nombre} fue eliminado definitivamente.`,
+      };
+    }
+
+    const desactivado = await usuarioRepository.desactivarYLiberarEmail(usuarioId, client);
+    if (!desactivado) {
+      throw AppError.conflict('No se pudo eliminar el usuario.');
+    }
+    return {
+      accion: ACCIONES_ELIMINACION.DESACTIVADO,
+      usuario: desactivado,
+      mensaje: `${desactivado.nombre} tiene cortes registrados: se conservó su historial, ` +
+        'se desactivó la cuenta y su correo quedó libre para una cuenta nueva.',
+    };
+  });
+};
+
 /**
  * Llamado desde el login fallido de una cuenta pendiente: envía al Súper
  * Administrador el enlace de aprobación (como máximo uno cada 15 minutos).
@@ -108,6 +169,7 @@ module.exports = {
   listar,
   crear,
   cambiarEstadoUsuario,
+  eliminarUsuario,
   notificarSolicitudAprobacion,
   aprobarPorToken,
 };

@@ -1408,3 +1408,49 @@ input {
     text-align: center;
   }
 }
+
+/* =========================================================
+   Eliminar usuarios
+   ========================================================= */
+.acciones-fila {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn--peligro {
+  color: #fff;
+  background: var(--rojo-texto);
+}
+
+.btn--peligro:hover:not(:disabled) {
+  background: #991b1b;
+}
+
+/* =========================================================
+   Historial de cortes por día (Dashboard)
+   ========================================================= */
+.historial-dia {
+  margin-top: 18px;
+}
+
+.historial-dia-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.historial-dia-cabecera h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.historial-dia-totales {
+  margin: 0 0 10px;
+}

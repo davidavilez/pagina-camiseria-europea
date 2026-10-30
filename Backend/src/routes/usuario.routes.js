@@ -12,5 +12,6 @@ router.use(autenticar, autorizar('usuarios:gestionar'));
 router.get('/', usuarioController.listar);
 router.post('/', usuarioController.crear);
 router.patch('/:id/estado', usuarioController.cambiarEstado);
+router.delete('/:id', usuarioController.eliminar);
 
 module.exports = router;
