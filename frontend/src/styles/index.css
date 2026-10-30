@@ -798,10 +798,18 @@ input {
 }
 
 .escaner-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   margin: 10px 0 0;
   color: var(--rojo-texto);
   font-size: 13px;
   text-align: center;
+}
+
+.escaner-error p {
+  margin: 0;
 }
 
 .ingreso-manual {
@@ -960,5 +968,443 @@ input {
     top: 0;
     left: 0;
     border-style: solid;
+  }
+}
+
+/* =========================================================
+   Filtros de inventario
+   ========================================================= */
+.barra-herramientas--fin {
+  justify-content: flex-end;
+}
+
+.selector {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  color: var(--texto);
+  background: #fff;
+  font: inherit;
+}
+
+.selector:focus {
+  border-color: var(--azul-600);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.selector-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--texto-suave);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tabla td.acciones {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.btn--compacto {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* =========================================================
+   Dashboard y reportes
+   ========================================================= */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--azul-600);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.kpi--estrella { border-left-color: #16a34a; }
+.kpi--estancada { border-left-color: #a8a7a1; }
+
+.kpi-titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--texto-suave);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.kpi-valor {
+  font-size: 24px;
+  color: var(--texto);
+}
+
+.graficos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.grafico {
+  padding: 16px 18px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.grafico h3,
+.seccion-titulo {
+  margin: 0 0 12px;
+  color: var(--texto);
+  font-size: 14px;
+}
+
+.grafico-tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  font-size: 12px;
+}
+
+.grafico-dona {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.leyenda {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.leyenda li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.leyenda-muestra {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.leyenda-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leyenda-valor {
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 860px) {
+  .kpis,
+  .graficos,
+  .grafico-dona {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cuenta-protegida {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--texto-suave);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: help;
+}
+
+/* =========================================================
+   Búsqueda por campo y resumen por tipo de tela
+   ========================================================= */
+.buscador-grupo {
+  display: flex;
+  flex: 1 1 380px;
+  gap: 8px;
+  min-width: 0;
+  max-width: 540px;
+  margin-right: auto;
+}
+
+.buscador-grupo .buscador {
+  min-width: 0;
+  max-width: none;
+  margin-right: 0;
+}
+
+.resumen-telas {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.resumen-telas > p {
+  margin: 0;
+}
+
+.resumen-tela {
+  padding: 16px 18px;
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--azul-600);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.resumen-tela-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.resumen-tela-cabecera .pagina-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.resumen-tela-cabecera h3 {
+  margin: 2px 0 0;
+  color: var(--azul-900);
+  font-size: 20px;
+}
+
+.resumen-tela-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.resumen-tela-total strong {
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+}
+
+.resumen-tela-subtitulo {
+  margin: 14px 0 8px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.resumen-colores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resumen-color {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.resumen-color .num {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  font-size: 16px;
+}
+
+/* =========================================================
+   Responsive: celulares
+   ========================================================= */
+/* El lector QR nunca debe ser más ancho que su tarjeta. */
+.tarjeta {
+  min-width: 0;
+}
+
+.escaner,
+.escaner-video {
+  width: 100%;
+  max-width: 100%;
+}
+
+.escaner-video > div {
+  width: 100% !important;
+}
+
+.escaner-video video {
+  max-width: 100%;
+  height: auto !important;
+}
+
+.escaner-video canvas,
+.escaner-video img {
+  max-width: 100%;
+}
+
+.etiqueta {
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  /* 16px evita que iOS haga zoom al enfocar un campo. */
+  input,
+  select {
+    font-size: 16px;
+  }
+
+  .pagina-cabecera h1 {
+    font-size: 22px;
+  }
+
+  .tarjeta {
+    padding: 16px;
+  }
+
+  .ficha-cabecera h2 {
+    font-size: 20px;
+  }
+
+  .saldo-grande {
+    font-size: 34px;
+  }
+
+  /* Barra de filtros: buscador a todo el ancho, el resto en dos columnas. */
+  .barra-herramientas .buscador-grupo {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .barra-herramientas > .selector,
+  .barra-herramientas > .btn {
+    flex: 1 1 140px;
+  }
+
+  .barra-titulo {
+    flex-basis: 100%;
+  }
+
+  .resumen-tela {
+    padding: 14px;
+  }
+
+  .resumen-tela-total {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .resumen-colores {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-fondo {
+    padding: 10px;
+  }
+
+  .modal {
+    max-height: calc(100vh - 20px);
+  }
+
+  .modal-cuerpo {
+    padding: 8px 16px 16px;
+  }
+
+  .formulario-acciones {
+    flex-wrap: wrap;
+  }
+
+  .formulario-acciones .btn {
+    flex: 1 1 auto;
+  }
+
+  /* Tablas como tarjetas: cada fila es un bloque y cada celda muestra su
+     encabezado (data-label) a la izquierda. */
+  .tabla--tarjetas thead {
+    display: none;
+  }
+
+  .tabla--tarjetas,
+  .tabla--tarjetas tbody,
+  .tabla--tarjetas tr {
+    display: block;
+    width: 100%;
+  }
+
+  .tabla--tarjetas tr {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--borde);
+  }
+
+  .tabla--tarjetas tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .tabla--tarjetas tbody tr:hover td {
+    background: none;
+  }
+
+  .tabla--tarjetas td {
+    display: flow-root;
+    padding: 5px 0;
+    border: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  .tabla--tarjetas td[data-label]::before {
+    content: attr(data-label);
+    float: left;
+    margin-right: 12px;
+    color: var(--texto-suave);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  .tabla--tarjetas td.acciones {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 8px;
+  }
+
+  .tabla--tarjetas td.acciones .btn-icono {
+    width: 40px;
+    height: 40px;
+  }
+
+  .tabla--tarjetas td.vacio {
+    text-align: center;
   }
 }

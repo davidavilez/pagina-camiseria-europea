@@ -45,7 +45,9 @@ export default function AuthProvider({ children }) {
 
   const valor = useMemo(() => ({
     usuario: sesion?.usuario ?? null,
-    autenticado: Boolean(sesion?.token),
+    // Una sesión sin usuario (storage corrupto o de otra versión) no cuenta como
+    // autenticada: evita leer `usuario.rol` de null y dejar la pantalla en blanco.
+    autenticado: Boolean(sesion?.token && sesion?.usuario?.rol),
     tienePermiso: (permiso) => Boolean(sesion?.usuario?.permisos?.includes(permiso)),
     avisoSesion,
     iniciarSesion,

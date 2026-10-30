@@ -1,13 +1,18 @@
+import { lazy } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ClipboardList, Package, Users } from 'lucide-react';
+import { ChartColumn, ClipboardList, Package, Users } from 'lucide-react';
 import InventarioTab from './InventarioTab';
 import UsuariosTab from './UsuariosTab';
 import AuditoriaTab from './AuditoriaTab';
+
+// Recharts es pesado: solo se descarga al abrir la pestaña de dashboard.
+const DashboardTab = lazy(() => import('./DashboardTab'));
 
 const PESTANAS = [
   { id: 'inventario', etiqueta: 'Inventario', Icono: Package, Componente: InventarioTab },
   { id: 'usuarios', etiqueta: 'Usuarios', Icono: Users, Componente: UsuariosTab },
   { id: 'auditoria', etiqueta: 'Historial de cortes', Icono: ClipboardList, Componente: AuditoriaTab },
+  { id: 'dashboard', etiqueta: 'Dashboard y Reportes', Icono: ChartColumn, Componente: DashboardTab },
 ];
 
 export default function Gerencia() {

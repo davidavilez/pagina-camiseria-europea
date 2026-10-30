@@ -18,11 +18,13 @@ const email = (valor) => {
   return limpio;
 };
 
-/** Número positivo con máximo 2 decimales (metros). */
-const metros = (valor, campo) => {
-  const numero = Number(valor);
-  if (!Number.isFinite(numero) || numero <= 0) {
-    throw AppError.badRequest(`El campo "${campo}" debe ser un número mayor que 0.`);
+/** Número positivo (o >= 0 con `permitirCero`) con máximo 2 decimales (metros). */
+const metros = (valor, campo, { permitirCero = false } = {}) => {
+  const numero = valor === '' || valor === null ? Number.NaN : Number(valor);
+  if (!Number.isFinite(numero) || numero < 0 || (numero === 0 && !permitirCero)) {
+    throw AppError.badRequest(
+      `El campo "${campo}" debe ser un número ${permitirCero ? 'mayor o igual a' : 'mayor que'} 0.`
+    );
   }
   const centimetros = Math.round(numero * 100);
   if (Math.abs(centimetros - numero * 100) > 1e-6) {

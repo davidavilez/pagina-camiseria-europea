@@ -6,8 +6,9 @@ export const INTERVALO_TIEMPO_REAL = 5000;
 /**
  * Consulta `cargarDatos` al montar y cada `intervalo` ms (actualización en
  * "tiempo real" por polling). Se pausa mientras la pestaña está oculta.
+ * Cuando cambia `clave` (p. ej. los filtros serializados) consulta de inmediato.
  */
-export default function usePolling(cargarDatos, intervalo = INTERVALO_TIEMPO_REAL) {
+export default function usePolling(cargarDatos, intervalo = INTERVALO_TIEMPO_REAL, clave = '') {
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState('');
   const [ultimaActualizacion, setUltimaActualizacion] = useState(null);
@@ -43,7 +44,7 @@ export default function usePolling(cargarDatos, intervalo = INTERVALO_TIEMPO_REA
       clearInterval(temporizador);
       document.removeEventListener('visibilitychange', consultar);
     };
-  }, [intervalo, version]);
+  }, [intervalo, version, clave]);
 
   const recargar = useCallback(() => setVersion((v) => v + 1), []);
 

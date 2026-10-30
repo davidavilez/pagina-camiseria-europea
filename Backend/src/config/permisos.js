@@ -12,6 +12,7 @@ const PERMISOS = Object.freeze({
   'rollos:consultar': { descripcion: 'consultar la ficha de un rollo', roles: [ROLES.GERENCIA, ROLES.OPERARIO] },
   'cortes:registrar': { descripcion: 'registrar cortes de tela', roles: [ROLES.OPERARIO] },
   'auditoria:ver': { descripcion: 'ver el historial de cortes', roles: [ROLES.GERENCIA] },
+  'reportes:ver': { descripcion: 'ver el dashboard y los reportes', roles: [ROLES.GERENCIA] },
 });
 
 const tienePermiso = (rol, permiso) => Boolean(PERMISOS[permiso]?.roles.includes(rol));

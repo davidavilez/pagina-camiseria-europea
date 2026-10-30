@@ -3,8 +3,18 @@ const ROLES = Object.freeze({
   OPERARIO: 'operario',
 });
 
-// Umbral (en metros) que separa "Stock Óptimo" de "Stock Bajo".
-const UMBRAL_STOCK_BAJO = 20;
+const ESTADOS_USUARIO = Object.freeze({
+  PENDIENTE: 'pendiente_aprobacion',
+  ACTIVO: 'activo',
+  INACTIVO: 'inactivo',
+});
+
+// Cuenta maestra del sistema: nunca puede darse de baja ni cambiar de estado.
+const GERENTE_GENERAL_EMAIL = 'gerente@camiseriaeuropea.com';
+
+// Stock mínimo (en metros) que se asigna a un rollo si gerencia no indica otro.
+// Al llegar a él el rollo pasa a "Stock Bajo" y se dispara la alerta por correo.
+const STOCK_MINIMO_POR_DEFECTO = 20;
 
 const ESTADOS_STOCK = Object.freeze({
   OPTIMO: 'optimo',
@@ -12,4 +22,4 @@ const ESTADOS_STOCK = Object.freeze({
   AGOTADO: 'agotado',
 });
 
-module.exports = { ROLES, UMBRAL_STOCK_BAJO, ESTADOS_STOCK };
+module.exports = { ROLES, ESTADOS_USUARIO, GERENTE_GENERAL_EMAIL, STOCK_MINIMO_POR_DEFECTO, ESTADOS_STOCK };

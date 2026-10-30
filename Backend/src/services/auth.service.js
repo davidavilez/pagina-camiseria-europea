@@ -2,7 +2,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { jwt: jwtConfig } = require('../config/env');
 const usuarioRepository = require('../repositories/usuario.repository');
+const usuarioService = require('./usuario.service');
 const { permisosDeRol } = require('../config/permisos');
+const { ESTADOS_USUARIO } = require('../config/constants');
 const AppError = require('../utils/AppError');
 
 // Hash de relleno: si el correo no existe igual se ejecuta bcrypt.compare,
@@ -33,7 +35,13 @@ const login = async ({ email, password }) => {
   if (!usuario || !passwordValida) {
     throw AppError.unauthorized('Correo o contraseña incorrectos.');
   }
-  if (usuario.estado !== 'activo') {
+  // Solo se llega aquí con la contraseña correcta, así nadie que conozca un
+  // correo ajeno puede disparar solicitudes de aprobación.
+  if (usuario.estado === ESTADOS_USUARIO.PENDIENTE) {
+    usuarioService.notificarSolicitudAprobacion(usuario); // no se espera: el login responde de inmediato
+    throw AppError.forbidden('Esperando aprobación de Gerencia');
+  }
+  if (usuario.estado !== ESTADOS_USUARIO.ACTIVO) {
     throw AppError.forbidden('Tu cuenta está desactivada. Contacta a gerencia.');
   }
 
@@ -50,7 +58,7 @@ const verificarToken = async (token) => {
   }
 
   const usuario = await usuarioRepository.buscarPorId(Number(payload.sub));
-  if (!usuario || usuario.estado !== 'activo') {
+  if (!usuario || usuario.estado !== ESTADOS_USUARIO.ACTIVO) {
     throw AppError.unauthorized('Tu sesión ya no es válida. Inicia sesión nuevamente.');
   }
   return aUsuarioPublico(usuario);

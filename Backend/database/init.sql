@@ -8,7 +8,8 @@
 -- Es idempotente: puede ejecutarse varias veces sin duplicar datos.
 -- NOTA: si la BD ya tiene tablas con el esquema antiguo (codigo_qr,
 -- operario_id VARCHAR, creado_en), CREATE TABLE IF NOT EXISTS no las
--- modificará. En ese caso se debe aplicar la migración correspondiente.
+-- modificará. En ese caso se debe aplicar la migración correspondiente
+-- (npm run db:migrate aplica database/migrations/*.sql).
 -- =====================================================================
 
 BEGIN;
@@ -22,7 +23,12 @@ CREATE TABLE IF NOT EXISTS usuarios (
   email           VARCHAR(254) NOT NULL UNIQUE CHECK (email = lower(email)),
   password_hash   TEXT         NOT NULL,
   rol             VARCHAR(20)  NOT NULL CHECK (rol IN ('gerencia', 'operario')),
-  estado          VARCHAR(10)  NOT NULL DEFAULT 'activo' CHECK (estado IN ('activo', 'inactivo')),
+  -- Toda cuenta nueva nace bloqueada hasta que el Súper Administrador la apruebe.
+  estado          VARCHAR(25)  NOT NULL DEFAULT 'pendiente_aprobacion'
+                  CONSTRAINT usuarios_estado_check
+                  CHECK (estado IN ('pendiente_aprobacion', 'activo', 'inactivo')),
+  aprobacion_token          VARCHAR(64) UNIQUE,
+  aprobacion_notificada_en  TIMESTAMPTZ,
   fecha_creacion  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
@@ -36,6 +42,10 @@ CREATE TABLE IF NOT EXISTS rollos (
   color            VARCHAR(50)   NOT NULL,
   metraje_inicial  NUMERIC(10,2) NOT NULL CHECK (metraje_inicial > 0),
   metraje_actual   NUMERIC(10,2) NOT NULL,
+  -- DSS: al caer a este saldo se envía una alerta (una sola vez) a gerencia.
+  stock_minimo     NUMERIC(10,2) NOT NULL DEFAULT 20
+                   CONSTRAINT rollos_stock_minimo_check CHECK (stock_minimo >= 0),
+  alerta_enviada   BOOLEAN       NOT NULL DEFAULT FALSE,
   fecha_ingreso    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   -- Última línea de defensa de la regla de negocio: el saldo nunca es
   -- negativo ni supera lo que ingresó a bodega.
@@ -57,18 +67,21 @@ CREATE TABLE IF NOT EXISTS cortes (
 CREATE INDEX IF NOT EXISTS idx_cortes_rollo_id    ON cortes (rollo_id);
 CREATE INDEX IF NOT EXISTS idx_cortes_operario_id ON cortes (operario_id);
 CREATE INDEX IF NOT EXISTS idx_cortes_fecha_corte ON cortes (fecha_corte DESC);
+CREATE INDEX IF NOT EXISTS idx_rollos_color_lower     ON rollos (lower(color));
+CREATE INDEX IF NOT EXISTS idx_rollos_tipo_tela_lower ON rollos (lower(tipo_tela));
 
 -- ---------------------------------------------------------------------
 -- Seed: Gerente inicial
 --   email:      gerente@camiseriaeuropea.com
 --   contraseña: Gerente#2026   (bcrypt, cost 12)  -> CAMBIAR tras el primer ingreso
 -- ---------------------------------------------------------------------
-INSERT INTO usuarios (nombre, email, password_hash, rol)
+INSERT INTO usuarios (nombre, email, password_hash, rol, estado)
 VALUES (
   'Gerente General',
   'gerente@camiseriaeuropea.com',
   '$2b$12$htOHCts90aPJQWJWpnfX9uPaWi3K0ohw3MEJ3mfYN62oEmPmBUtrq',
-  'gerencia'
+  'gerencia',
+  'activo'
 )
 ON CONFLICT (email) DO NOTHING;
 

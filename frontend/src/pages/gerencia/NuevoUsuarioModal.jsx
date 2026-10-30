@@ -18,8 +18,7 @@ export default function NuevoUsuarioModal({ onCerrar, onCreado }) {
     setEnviando(true);
     setError('');
     try {
-      await crearUsuario(formulario);
-      onCreado();
+      onCreado(await crearUsuario(formulario));
       onCerrar();
     } catch (err) {
       setError(mensajeDeError(err));
@@ -36,7 +35,7 @@ export default function NuevoUsuarioModal({ onCerrar, onCreado }) {
         <label htmlFor="email">Correo electrónico</label>
         <input id="email" name="email" type="email" autoComplete="off" value={formulario.email} onChange={cambiar} required />
 
-        <label htmlFor="password">Contraseña temporal</label>
+        <label htmlFor="password">Contraseña</label>
         <div className="password-field">
           <input id="password" name="password" type={mostrarPassword ? 'text' : 'password'} autoComplete="new-password" value={formulario.password} onChange={cambiar} placeholder="Mínimo 8 caracteres" required minLength={8} maxLength={72} />
           <button type="button" className="password-toggle" aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} onClick={() => setMostrarPassword(!mostrarPassword)}>
@@ -53,6 +52,11 @@ export default function NuevoUsuarioModal({ onCerrar, onCreado }) {
             </label>
           ))}
         </div>
+
+        <p className="tenue">
+          La cuenta quedará <b>pendiente de aprobación</b>: el usuario recibirá sus credenciales por correo
+          y podrá ingresar cuando el Súper Administrador apruebe el acceso.
+        </p>
 
         <Alerta>{error}</Alerta>
 

@@ -1,5 +1,5 @@
 const app = require('./app');
-const { port } = require('./config/env');
+const { port, apiUrl, frontendUrl } = require('./config/env');
 const { verificarConexion } = require('./config/db');
 
 const arrancarServidor = async () => {
@@ -12,6 +12,8 @@ const arrancarServidor = async () => {
 
   app.listen(port, () => {
     console.log(`API de Camisería Europea en http://localhost:${port}/api`);
+    // Base de los enlaces que viajan por correo: debe ser accesible desde el celular.
+    console.log(`Enlaces de correo -> aprobación: ${apiUrl}/api/usuarios/aprobar/... · login: ${frontendUrl}/login`);
   });
 };
 

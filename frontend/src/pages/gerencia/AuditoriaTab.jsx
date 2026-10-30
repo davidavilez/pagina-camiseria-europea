@@ -15,7 +15,7 @@ export default function AuditoriaTab() {
 
       {cargando ? <p className="vacio">Cargando historial...</p> : (
         <div className="tabla-scroll">
-          <table className="tabla">
+          <table className="tabla tabla--tarjetas">
             <thead>
               <tr>
                 <th>Fecha del corte</th>
@@ -29,12 +29,12 @@ export default function AuditoriaTab() {
             <tbody>
               {(cortes ?? []).map((c) => (
                 <tr key={c.id}>
-                  <td>{formatearFecha(c.fecha_corte)}</td>
-                  <td className="mono">#{c.rollo_id}</td>
-                  <td><span className="fuerte">{c.codigo_sku}</span> <span className="tenue">· {c.tipo_tela} {c.color}</span></td>
-                  <td className="num texto-rojo">−{formatearMetros(c.metros_cortados)}</td>
-                  <td className="num fuerte">{formatearMetros(c.saldo_restante)}</td>
-                  <td>{c.operario_nombre}</td>
+                  <td data-label="Fecha">{formatearFecha(c.fecha_corte)}</td>
+                  <td data-label="ID rollo" className="mono">#{c.rollo_id}</td>
+                  <td data-label="Rollo"><span className="fuerte">{c.codigo_sku}</span> <span className="tenue">· {c.tipo_tela} {c.color}</span></td>
+                  <td data-label="Descontado" className="num texto-rojo">−{formatearMetros(c.metros_cortados)}</td>
+                  <td data-label="Saldo restante" className="num fuerte">{formatearMetros(c.saldo_restante)}</td>
+                  <td data-label="Operario">{c.operario_nombre}</td>
                 </tr>
               ))}
               {cortes?.length === 0 && <tr><td colSpan={6} className="vacio">Todavía no se han registrado cortes.</td></tr>}

@@ -1,38 +1,38 @@
-Directrices del Sistema: Inventario QR - Camisería Europea
+# Directrices del Sistema: Inventario QR - Camisería Europea
 
-CONTEXTO DEL PROYECTO
-Este es el código fuente del proyecto "APP-INV-QR-CE-01", un sistema de trazabilidad de inventario textil para Camisería Europea. Utiliza el Stack PERN (PostgreSQL, Express, React, Node.js).
+## CONTEXTO DEL PROYECTO
+Este es el código fuente del proyecto "APP-INV-QR-CE-01", un sistema de trazabilidad de inventario textil y soporte a la toma de decisiones para Camisería Europea. Utiliza el Stack PERN (PostgreSQL, Express, React, Node.js).
 
-ARQUITECTURA DE SOFTWARE
-El proyecto sigue un patrón de Arquitectura Cliente-Servidor por Capas:
+## ARQUITECTURA DE SOFTWARE
+El proyecto sigue un patrón estricto de Arquitectura Cliente-Servidor por Capas (Controlador-Servicio-Repositorio):
 
-Capa de Presentación: Construida en React (SPA). Separada lógicamente por roles (Componentes Gerencia.jsx y Operario.jsx).
+1. **Capa de Presentación:** Construida en React (SPA). Separada lógicamente por roles y flujos. Utiliza `recharts` para dashboards estadísticos y generación de reportes PDF.
+2. **Capa de API/Controladores:** Express.js gestiona las rutas RESTful, validación de peticiones y Middlewares de Autenticación JWT.
+3. **Capa de Lógica de Negocio (Servicios):** Node.js ejecuta los cálculos de saldos, genera Códigos QR (`qrcode`), valida colores de tela mediante diccionarios estrictos, y gestiona el envío de correos automatizados (`nodemailer`) para aprobaciones y alertas.
+4. **Capa de Acceso a Datos (Repositorios):** PostgreSQL mediante el driver `pg`. Obligatorio el uso de consultas parametrizadas y aislamiento estricto de la lógica SQL.
 
-Capa de API/Controladores: Express.js gestiona las rutas RESTful, recibe JSON y valida peticiones (Middlewares de Autenticación).
+## ESTRUCTURA DE BASE DE DATOS REQUERIDA (POSTGRESQL)
+El sistema se sostiene sobre 3 entidades principales con integridad referencial:
 
-Capa de Lógica de Negocio: Servicios de Node.js donde se calculan los saldos, se valida el stock y se generan los Códigos QR usando la librería qrcode.
+- **usuarios:** (id, nombre, email, password_hash, rol, estado, aprobacion_token, fecha_creacion). 
+  *(Nota: 'estado' maneja 'pendiente_aprobacion' y 'activo').*
+- **rollos:** (id, codigo_sku, tipo_tela, color, metraje_inicial, metraje_actual, stock_minimo, alerta_enviada, fecha_ingreso).
+- **cortes:** (id, rollo_id [FK], usuario_id [FK], metros_cortados, fecha_corte).
 
-Capa de Acceso a Datos (Persistencia): PostgreSQL mediante el driver pg. Obligatorio el uso de consultas parametrizadas para evitar SQL Injection.
+## REGLAS DE NEGOCIO ESTRICTAS
 
-ESTRUCTURA DE BASE DE DATOS REQUERIDA (POSTGRESQL)
-El sistema se sostiene sobre 3 entidades con integridad referencial:
+**1. Control de Acceso y Aprobación Dual (RBAC):**
+- **gerencia:** Acceso a gestión de usuarios, ingreso de rollos, dashboards y reportes.
+- **operario:** Acceso restringido. Únicamente puede escanear códigos QR y reportar cortes de tela.
+- **Aprobación Dual (Seguridad):** Ningún usuario puede auto-registrarse. La gerencia crea las cuentas, pero nacen en estado `pendiente_aprobacion`. El acceso solo se habilita cuando el Súper Administrador aprueba el ingreso mediante un enlace enviado por SMTP (Gmail).
 
-usuarios (id, nombre, email, password_hash, rol, estado, fecha_creacion).
+**2. Consistencia de Inventario y Transacciones ACID:**
+- Un corte JAMÁS puede ser procesado si la cantidad a descontar es superior al `metraje_actual` del rollo.
+- El proceso de "Descontar tela" (restar en `rollos` e insertar en `cortes`) y la evaluación de alertas de stock, DEBE ejecutarse dentro de una única transacción SQL (`BEGIN`, `COMMIT`, `ROLLBACK`).
 
-rollos (id, codigo_sku, tipo_tela, color, metraje_inicial, metraje_actual, fecha_ingreso).
+**3. Soporte a Decisiones (DSS) y Alertas Automáticas:**
+- **Alertas de Stock:** Si al descontar tela el `metraje_actual` cae por debajo o igual al `stock_minimo`, se debe disparar un correo SMTP de alerta al gerente de forma automática y cambiar el flag `alerta_enviada` a `true`.
+- **Filtros Acumulativos:** Las búsquedas de inventario deben permitir el cruce de texto libre, colores y tipos de tela de forma simultánea.
 
-cortes (id, rollo_id [FK], operario_id [FK], metros_cortados, fecha_corte).
-
-REGLAS DE NEGOCIO ESTRICTAS
-
-Control de Acceso Basado en Roles (RBAC):
-
-gerencia: Acceso total. Gestión de usuarios, ingreso de rollos, visión de reportes y auditoría.
-
-operario: Acceso restringido. Únicamente puede escanear códigos QR y reportar cortes de tela.
-
-Regla de creación: Ningún usuario puede auto-registrarse. Solo los perfiles de gerencia pueden crear nuevas cuentas.
-
-Consistencia de Inventario:
-
-Un corte JAMÁS puede ser procesado si la cantidad a descontar es superior al metraje_actual del rollo. El sistema debe lanzar un error descriptivo.
+**4. Validación de Calidad de Datos:**
+- El sistema debe bloquear cualquier intento de registrar un nuevo rollo cuyo "color" no pertenezca a un catálogo/diccionario de colores textiles válidos parametrizado en el backend, o que contenga caracteres especiales/números.

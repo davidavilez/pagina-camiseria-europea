@@ -23,6 +23,8 @@ export default function Login() {
       navigate(rutaInicioPorRol(usuario.rol), { replace: true });
     } catch (err) {
       setError(mensajeDeError(err));
+    } finally {
+      // Siempre se libera el botón, aunque la navegación falle o el login se rechace (403/401).
       setCargando(false);
     }
   };
