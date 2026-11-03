@@ -1,3 +1,4 @@
+const { withTransaction } = require('../config/db');
 const rolloRepository = require('../repositories/rollo.repository');
 const qrService = require('./qr.service');
 const estanteriaService = require('./estanteria.service');
@@ -109,11 +110,16 @@ const crear = async ({ codigo_sku, tipo_tela, color, metraje_inicial, stock_mini
     throw AppError.badRequest('El stock mínimo debe ser menor que el metraje inicial.');
   }
 
-  datos.estanteriaId = await estanteriaService.resolverId(estanteria_id);
+  datos.estanteriaId = estanteriaService.leerId(estanteria_id);
 
   let rollo;
   try {
-    rollo = await rolloRepository.crear(datos);
+    rollo = await withTransaction(async (client) => {
+      if (datos.estanteriaId) {
+        await estanteriaService.reservarLugar(datos.estanteriaId, client);
+      }
+      return rolloRepository.crear(datos, client);
+    });
   } catch (error) {
     if (error.code === '23505') {
       throw AppError.conflict(`Ya existe un rollo con el código ${datos.codigoSku}.`);
@@ -143,12 +149,20 @@ const cambiarUbicacion = async (id, { estanteria_id }) => {
   if (estanteria_id === undefined) {
     throw AppError.badRequest('Indica la estantería en el campo "estanteria_id".');
   }
-  const estanteriaId = await estanteriaService.resolverId(estanteria_id);
+  const estanteriaId = estanteriaService.leerId(estanteria_id);
 
-  const rollo = await rolloRepository.actualizarUbicacion(rolloId, estanteriaId);
-  if (!rollo) {
-    throw AppError.notFound('El rollo no existe en la bodega.');
-  }
+  // Siempre rollo y luego estantería: un orden único de bloqueo evita interbloqueos.
+  const rollo = await withTransaction(async (client) => {
+    const actual = await rolloRepository.bloquearUbicacion(rolloId, client);
+    if (!actual) {
+      throw AppError.notFound('El rollo no existe en la bodega.');
+    }
+    // Quedarse en la misma estantería no ocupa un lugar nuevo.
+    if (estanteriaId && estanteriaId !== actual.estanteria_id) {
+      await estanteriaService.reservarLugar(estanteriaId, client);
+    }
+    return rolloRepository.actualizarUbicacion(rolloId, estanteriaId, client);
+  });
   return conEstado(rollo);
 };
 

@@ -131,6 +131,12 @@ const crear = async ({ codigoSku, tipoTela, color, metrajeInicial, stockMinimo, 
   return buscarPorId(rows[0].id, db);
 };
 
+/** Lee la estantería actual del rollo y bloquea su fila. Requiere `client` en `withTransaction`. */
+const bloquearUbicacion = async (id, client) => {
+  const { rows } = await client.query('SELECT estanteria_id FROM rollos WHERE id = $1 FOR UPDATE', [id]);
+  return rows[0] ?? null;
+};
+
 const actualizarUbicacion = async (id, estanteriaId, db = pool) => {
   const { rows } = await db.query(
     'UPDATE rollos SET estanteria_id = $2 WHERE id = $1 RETURNING id',
@@ -183,6 +189,7 @@ module.exports = {
   buscarPorId,
   buscarPorIdParaActualizar,
   crear,
+  bloquearUbicacion,
   actualizarUbicacion,
   descontarMetraje,
   marcarAlertaEnviada,

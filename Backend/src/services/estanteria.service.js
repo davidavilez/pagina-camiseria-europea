@@ -22,15 +22,29 @@ const crear = async ({ codigo, descripcion }) => {
   }
 };
 
-/** Valida la estantería indicada para un rollo. Vacío => null ("Sin asignar"). */
-const resolverId = async (valor) => {
+/** Lee la estantería indicada para un rollo. Vacío => null ("Sin asignar"). */
+const leerId = (valor) => {
   if (valor === undefined || valor === null || valor === '') return null;
-
-  const id = validar.idEntero(valor, 'ID de la estantería');
-  if (!await estanteriaRepository.buscarPorId(id)) {
-    throw AppError.badRequest(`La estantería con ID ${id} no existe.`);
-  }
-  return id;
+  return validar.idEntero(valor, 'ID de la estantería');
 };
 
-module.exports = { listar, crear, resolverId };
+/**
+ * Exige que la estantería exista y tenga un lugar libre. Debe llamarse dentro de
+ * la transacción que guarda el rollo: el bloqueo se mantiene hasta su COMMIT, y el
+ * conteo es una consulta posterior al bloqueo para ver lo que confirmó la anterior.
+ */
+const reservarLugar = async (id, client) => {
+  const estanteria = await estanteriaRepository.buscarPorIdParaActualizar(id, client);
+  if (!estanteria) {
+    throw AppError.badRequest(`La estantería con ID ${id} no existe.`);
+  }
+
+  const ocupacion = await estanteriaRepository.contarOcupacion(id, client);
+  if (ocupacion >= estanteria.capacidad) {
+    throw AppError.conflict(
+      `Estantería llena: ${estanteria.codigo} ya tiene ${ocupacion} de ${estanteria.capacidad} rollos.`
+    );
+  }
+};
+
+module.exports = { listar, crear, leerId, reservarLugar };
