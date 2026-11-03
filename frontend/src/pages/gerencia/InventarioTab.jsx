@@ -152,7 +152,7 @@ export default function InventarioTab() {
       <div className="barra-herramientas barra-herramientas--fin">
         {estanteriaFiltrada && (
           <span className="tenue">
-            Estantería <strong>{estanteriaFiltrada.codigo}</strong>: {estanteriaFiltrada.ocupacion}/{estanteriaFiltrada.capacidad} rollos · {estaLlena(estanteriaFiltrada) ? 'Llena' : `${estanteriaFiltrada.disponibles} libres`}
+            Estantería <strong>{estanteriaFiltrada.codigo}</strong>: {estanteriaFiltrada.ocupacion}/{estanteriaFiltrada.capacidad} rollos · {estaLlena(estanteriaFiltrada) ? 'Llena' : `${estanteriaFiltrada.disponibles} ${estanteriaFiltrada.disponibles === 1 ? 'libre' : 'libres'}`}
           </span>
         )}
         <IndicadorEnVivo ultimaActualizacion={ultimaActualizacion} error={error} />
