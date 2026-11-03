@@ -28,8 +28,12 @@ const reabastecer = async (req, res) => {
   res.json(await rolloService.reabastecer(req.params.id, req.body ?? {}));
 };
 
+const cambiarUbicacion = async (req, res) => {
+  res.json(await rolloService.cambiarUbicacion(req.params.id, req.body ?? {}));
+};
+
 const obtenerEtiqueta = async (req, res) => {
   res.json(await rolloService.obtenerEtiqueta(req.params.id));
 };
 
-module.exports = { listar, resumen, opcionesFiltro, catalogoColores, obtenerPorId, crear, reabastecer, obtenerEtiqueta };
+module.exports = { listar, resumen, opcionesFiltro, catalogoColores, obtenerPorId, crear, reabastecer, cambiarUbicacion, obtenerEtiqueta };

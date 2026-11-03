@@ -1,5 +1,6 @@
 const rolloRepository = require('../repositories/rollo.repository');
 const qrService = require('./qr.service');
+const estanteriaService = require('./estanteria.service');
 const { STOCK_MINIMO_POR_DEFECTO, ESTADOS_STOCK } = require('../config/constants');
 const AppError = require('../utils/AppError');
 const validar = require('../utils/validacion');
@@ -29,14 +30,20 @@ const filtroOpcional = (valor, campo, max) => {
 
 // Campo sobre el que actúa el texto libre; sin `buscar_por` se busca en todos.
 const CAMPOS_BUSQUEDA = ['codigo', 'tela'];
+// Valor de `estanteria_id` que filtra los rollos que aún no tienen ubicación.
+const SIN_ASIGNAR = 'sin_asignar';
 
-const leerFiltros = ({ search, buscar_por: buscarPor, color, tipo_tela: tipoTela } = {}) => ({
+const leerFiltros = ({ search, buscar_por: buscarPor, color, tipo_tela: tipoTela, estanteria_id: estanteria } = {}) => ({
   search: filtroOpcional(search, 'search', 100),
   buscarPor: buscarPor === undefined || buscarPor === ''
     ? undefined
     : validar.opcion(buscarPor, CAMPOS_BUSQUEDA, 'buscar_por'),
   color: filtroOpcional(color, 'color', 50),
   tipoTela: filtroOpcional(tipoTela, 'tipo_tela', 80),
+  sinEstanteria: estanteria === SIN_ASIGNAR,
+  estanteriaId: estanteria === undefined || estanteria === '' || estanteria === SIN_ASIGNAR
+    ? undefined
+    : validar.idEntero(estanteria, 'filtro de estantería'),
 });
 
 const listar = async (query) => (await rolloRepository.listar(leerFiltros(query))).map(conEstado);
@@ -87,7 +94,7 @@ const obtenerPorId = async (id) => {
 };
 
 /** Registra el rollo (metraje_actual = metraje_inicial) y devuelve su etiqueta QR. */
-const crear = async ({ codigo_sku, tipo_tela, color, metraje_inicial, stock_minimo }) => {
+const crear = async ({ codigo_sku, tipo_tela, color, metraje_inicial, stock_minimo, estanteria_id }) => {
   const datos = {
     codigoSku: validar.texto(codigo_sku, 'Código/SKU', { min: 1, max: 50 }).toUpperCase(),
     tipoTela: validar.texto(tipo_tela, 'Tipo de tela', { min: 2, max: 80 }),
@@ -101,6 +108,8 @@ const crear = async ({ codigo_sku, tipo_tela, color, metraje_inicial, stock_mini
   if (datos.stockMinimo >= datos.metrajeInicial) {
     throw AppError.badRequest('El stock mínimo debe ser menor que el metraje inicial.');
   }
+
+  datos.estanteriaId = await estanteriaService.resolverId(estanteria_id);
 
   let rollo;
   try {
@@ -128,6 +137,21 @@ const reabastecer = async (id, { metros }) => {
   return conEstado(rollo);
 };
 
+/** Cambia la estantería del rollo; `estanteria_id: null` lo deja "Sin asignar". */
+const cambiarUbicacion = async (id, { estanteria_id }) => {
+  const rolloId = validar.idEntero(id, 'ID del rollo');
+  if (estanteria_id === undefined) {
+    throw AppError.badRequest('Indica la estantería en el campo "estanteria_id".');
+  }
+  const estanteriaId = await estanteriaService.resolverId(estanteria_id);
+
+  const rollo = await rolloRepository.actualizarUbicacion(rolloId, estanteriaId);
+  if (!rollo) {
+    throw AppError.notFound('El rollo no existe en la bodega.');
+  }
+  return conEstado(rollo);
+};
+
 const obtenerEtiqueta = async (id) => {
   const rollo = await obtenerPorId(id);
   const qr = await qrService.generarQrRollo(rollo.id);
@@ -142,6 +166,7 @@ module.exports = {
   obtenerPorId,
   crear,
   reabastecer,
+  cambiarUbicacion,
   obtenerEtiqueta,
   calcularEstadoStock,
 };

@@ -1,6 +1,9 @@
 const AppError = require('./AppError');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CODIGO_ESTANTERIA_REGEX = /^[A-Z]{1,3}-\d{2,3}$/;
+// Máximo de una columna INTEGER de PostgreSQL.
+const ID_MAXIMO = 2147483647;
 
 const texto = (valor, campo, { min = 1, max = 255 } = {}) => {
   const limpio = typeof valor === 'string' ? valor.trim() : '';
@@ -38,10 +41,19 @@ const metros = (valor, campo, { permitirCero = false } = {}) => {
 
 const idEntero = (valor, campo = 'id') => {
   const numero = Number(valor);
-  if (!Number.isInteger(numero) || numero <= 0) {
+  if (!Number.isInteger(numero) || numero <= 0 || numero > ID_MAXIMO) {
     throw AppError.badRequest(`El ${campo} no es válido.`);
   }
   return numero;
+};
+
+/** Código de estantería en mayúsculas, con el formato "A-01". */
+const codigoEstanteria = (valor) => {
+  const limpio = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
+  if (!CODIGO_ESTANTERIA_REGEX.test(limpio)) {
+    throw AppError.badRequest('El código de la estantería debe tener el formato "A-01".');
+  }
+  return limpio;
 };
 
 const opcion = (valor, opciones, campo) => {
@@ -67,4 +79,4 @@ const fecha = (valor, campo = 'fecha') => {
   return valor;
 };
 
-module.exports = { texto, email, metros, idEntero, opcion, fecha };
+module.exports = { texto, email, metros, idEntero, codigoEstanteria, opcion, fecha };

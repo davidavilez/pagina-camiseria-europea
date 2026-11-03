@@ -3,6 +3,12 @@ const { pool } = require('../config/db');
 const COLUMNAS = `id, codigo_sku, tipo_tela, color, metraje_inicial, metraje_actual,
   stock_minimo, alerta_enviada, fecha_ingreso`;
 
+// Lecturas con ubicación. Van aparte de COLUMNAS porque la transacción de corte
+// usa FOR UPDATE, que no admite el lado opcional de un LEFT JOIN.
+const COLUMNAS_CON_UBICACION = `r.id, r.codigo_sku, r.tipo_tela, r.color, r.metraje_inicial, r.metraje_actual,
+  r.stock_minimo, r.alerta_enviada, r.fecha_ingreso, r.estanteria_id, e.codigo AS estanteria_codigo`;
+const ROLLOS_CON_UBICACION = 'rollos r LEFT JOIN estanterias e ON e.id = r.estanteria_id';
+
 /** Escapa los comodines de LIKE para que el texto del usuario se busque literal. */
 const escaparLike = (texto) => texto.replace(/[\\%_]/g, (c) => `\\${c}`);
 
@@ -19,16 +25,16 @@ const condicionBusqueda = (search, buscarPor, valores) => {
     const id = /^#?\d{1,9}$/.test(search) ? Number(search.replace('#', '')) : null;
     if (id === null) return `codigo_sku ILIKE ${p}`;
     valores.push(id);
-    return `(codigo_sku ILIKE ${p} OR id = $${valores.length})`;
+    return `(codigo_sku ILIKE ${p} OR r.id = $${valores.length})`;
   }
-  return `(codigo_sku ILIKE ${p} OR tipo_tela ILIKE ${p} OR color ILIKE ${p} OR id::text ILIKE ${p})`;
+  return `(codigo_sku ILIKE ${p} OR tipo_tela ILIKE ${p} OR color ILIKE ${p} OR r.id::text ILIKE ${p})`;
 };
 
 /**
  * Filtros acumulativos. Cada filtro solo se agrega al WHERE si viene
  * informado; los valores siempre viajan como parámetros ($n).
  */
-const construirWhere = ({ search, buscarPor, color, tipoTela } = {}) => {
+const construirWhere = ({ search, buscarPor, color, tipoTela, estanteriaId, sinEstanteria } = {}) => {
   const condiciones = [];
   const valores = [];
 
@@ -43,6 +49,12 @@ const construirWhere = ({ search, buscarPor, color, tipoTela } = {}) => {
     valores.push(tipoTela);
     condiciones.push(`lower(tipo_tela) = lower($${valores.length})`);
   }
+  if (sinEstanteria) {
+    condiciones.push('r.estanteria_id IS NULL');
+  } else if (estanteriaId) {
+    valores.push(estanteriaId);
+    condiciones.push(`r.estanteria_id = $${valores.length}`);
+  }
 
   const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
   return { where, valores };
@@ -51,7 +63,7 @@ const construirWhere = ({ search, buscarPor, color, tipoTela } = {}) => {
 const listar = async (filtros, db = pool) => {
   const { where, valores } = construirWhere(filtros);
   const { rows } = await db.query(
-    `SELECT ${COLUMNAS} FROM rollos ${where} ORDER BY fecha_ingreso DESC, id DESC`,
+    `SELECT ${COLUMNAS_CON_UBICACION} FROM ${ROLLOS_CON_UBICACION} ${where} ORDER BY r.fecha_ingreso DESC, r.id DESC`,
     valores
   );
   return rows;
@@ -70,7 +82,7 @@ const resumirPorTelaYColor = async (filtros, db = pool) => {
             COUNT(*) FILTER (WHERE metraje_actual > 0)::int   AS rollos,
             COUNT(*) FILTER (WHERE metraje_actual <= 0)::int  AS agotados,
             COALESCE(SUM(metraje_actual), 0)                  AS metros
-       FROM rollos ${where}
+       FROM rollos r ${where}
       GROUP BY lower(tipo_tela), lower(color)
       ORDER BY lower(tipo_tela), metros DESC, lower(color)`,
     valores
@@ -89,7 +101,10 @@ const listarOpcionesFiltro = async (db = pool) => {
 };
 
 const buscarPorId = async (id, db = pool) => {
-  const { rows } = await db.query(`SELECT ${COLUMNAS} FROM rollos WHERE id = $1`, [id]);
+  const { rows } = await db.query(
+    `SELECT ${COLUMNAS_CON_UBICACION} FROM ${ROLLOS_CON_UBICACION} WHERE r.id = $1`,
+    [id]
+  );
   return rows[0] ?? null;
 };
 
@@ -106,14 +121,22 @@ const buscarPorIdParaActualizar = async (id, client) => {
   return rows[0] ?? null;
 };
 
-const crear = async ({ codigoSku, tipoTela, color, metrajeInicial, stockMinimo }, db = pool) => {
+const crear = async ({ codigoSku, tipoTela, color, metrajeInicial, stockMinimo, estanteriaId }, db = pool) => {
   const { rows } = await db.query(
-    `INSERT INTO rollos (codigo_sku, tipo_tela, color, metraje_inicial, metraje_actual, stock_minimo)
-     VALUES ($1, $2, $3, $4, $4, $5)
-     RETURNING ${COLUMNAS}`,
-    [codigoSku, tipoTela, color, metrajeInicial, stockMinimo]
+    `INSERT INTO rollos (codigo_sku, tipo_tela, color, metraje_inicial, metraje_actual, stock_minimo, estanteria_id)
+     VALUES ($1, $2, $3, $4, $4, $5, $6)
+     RETURNING id`,
+    [codigoSku, tipoTela, color, metrajeInicial, stockMinimo, estanteriaId]
   );
-  return rows[0];
+  return buscarPorId(rows[0].id, db);
+};
+
+const actualizarUbicacion = async (id, estanteriaId, db = pool) => {
+  const { rows } = await db.query(
+    'UPDATE rollos SET estanteria_id = $2 WHERE id = $1 RETURNING id',
+    [id, estanteriaId]
+  );
+  return rows[0] ? buscarPorId(rows[0].id, db) : null;
 };
 
 const descontarMetraje = async (id, metros, client) => {
@@ -160,6 +183,7 @@ module.exports = {
   buscarPorId,
   buscarPorIdParaActualizar,
   crear,
+  actualizarUbicacion,
   descontarMetraje,
   marcarAlertaEnviada,
   reabastecer,
