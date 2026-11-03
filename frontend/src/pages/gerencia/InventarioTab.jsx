@@ -16,6 +16,7 @@ import UbicacionModal from './UbicacionModal';
 import ResumenTela from './ResumenTela';
 import { ESTADOS_STOCK } from '../../utils/stock';
 import { formatearFecha, formatearMetros } from '../../utils/formato';
+import { estaLlena } from '../../utils/estanterias';
 
 const OPCIONES_REFRESCO = 30000;
 
@@ -45,7 +46,9 @@ export default function InventarioTab() {
     () => listarRollos(filtros), undefined, JSON.stringify(filtros)
   );
   const { datos: opciones, recargar: recargarOpciones } = usePolling(obtenerOpcionesFiltro, OPCIONES_REFRESCO);
-  const { datos: estanterias } = usePolling(listarEstanterias, OPCIONES_REFRESCO);
+  // Al ritmo de la tabla, porque de aquí sale la ocupación que se muestra.
+  const { datos: estanterias, recargar: recargarEstanterias } = usePolling(listarEstanterias);
+  const estanteriaFiltrada = estanterias?.find((e) => String(e.id) === estanteria);
 
   const [creando, setCreando] = useState(false);
   const [reabasteciendo, setReabasteciendo] = useState(null);
@@ -86,6 +89,12 @@ export default function InventarioTab() {
   const alCrear = () => {
     recargar();
     recargarOpciones();
+    recargarEstanterias();
+  };
+
+  const alReubicar = () => {
+    recargar();
+    recargarEstanterias();
   };
 
   return (
@@ -141,6 +150,11 @@ export default function InventarioTab() {
       </div>
 
       <div className="barra-herramientas barra-herramientas--fin">
+        {estanteriaFiltrada && (
+          <span className="tenue">
+            Estantería <strong>{estanteriaFiltrada.codigo}</strong>: {estanteriaFiltrada.ocupacion}/{estanteriaFiltrada.capacidad} rollos · {estaLlena(estanteriaFiltrada) ? 'Llena' : `${estanteriaFiltrada.disponibles} libres`}
+          </span>
+        )}
         <IndicadorEnVivo ultimaActualizacion={ultimaActualizacion} error={error} />
         <button type="button" className="btn btn--primario" onClick={() => setCreando(true)}>
           <Plus size={16} /> Agregar Rollo
@@ -205,7 +219,7 @@ export default function InventarioTab() {
 
       {creando && <NuevoRolloModal onCerrar={() => setCreando(false)} onCreado={alCrear} />}
       {reabasteciendo && <ReabastecerModal rollo={reabasteciendo} onCerrar={() => setReabasteciendo(null)} onReabastecido={recargar} />}
-      {ubicando && <UbicacionModal rollo={ubicando} estanterias={estanterias ?? []} onCerrar={() => setUbicando(null)} onReubicado={recargar} />}
+      {ubicando && <UbicacionModal rollo={ubicando} estanterias={estanterias ?? []} onCerrar={() => setUbicando(null)} onReubicado={alReubicar} onRechazado={recargarEstanterias} />}
       {etiqueta && (
         <Modal titulo={`Etiqueta del rollo ${etiqueta.rollo.codigo_sku}`} onCerrar={() => setEtiqueta(null)}>
           <EtiquetaQR rollo={etiqueta.rollo} qr={etiqueta.qr} />

@@ -3,22 +3,22 @@ import Modal from '../../components/Modal';
 import Alerta from '../../components/Alerta';
 import EtiquetaQR from '../../components/EtiquetaQR';
 import useDebounce from '../../hooks/useDebounce';
+import usePolling from '../../hooks/usePolling';
 import { crearRollo, listarRollos, obtenerCatalogoColores } from '../../api/rollos.api';
 import { listarEstanterias } from '../../api/estanterias.api';
 import { mensajeDeError } from '../../api/client';
+import { estaLlena, etiquetaEstanteria } from '../../utils/estanterias';
 
 const FORMULARIO_VACIO = { codigo_sku: '', tipo_tela: '', color: '', metraje_inicial: '', stock_minimo: '20', estanteria_id: '' };
 
-/** Estantería con más rollos con saldo; en empate, la del rollo más reciente. */
-const estanteriaMasUsada = (rollos) => {
+/** IDs de estanterías con rollos con saldo, de más a menos usada; en empate, la del rollo más reciente. */
+const estanteriasPorUso = (rollos) => {
   const conteo = new Map();
-  let mejor = '';
   for (const { estanteria_id: id, metraje_actual: saldo } of rollos) {
     if (id === null || saldo <= 0) continue;
     conteo.set(id, (conteo.get(id) ?? 0) + 1);
-    if (mejor === '' || conteo.get(id) > conteo.get(Number(mejor))) mejor = String(id);
   }
-  return mejor;
+  return [...conteo.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
 };
 
 export default function NuevoRolloModal({ onCerrar, onCreado }) {
@@ -27,17 +27,14 @@ export default function NuevoRolloModal({ onCerrar, onCreado }) {
   const [error, setError] = useState('');
   const [resultado, setResultado] = useState(null);
   const [catalogoColores, setCatalogoColores] = useState([]);
-  const [estanterias, setEstanterias] = useState([]);
-  const [errorEstanterias, setErrorEstanterias] = useState('');
   const [sugerencia, setSugerencia] = useState(null);
+  // Con polling la ocupación se mantiene al día mientras el formulario está abierto.
+  const { datos: estanterias, error: errorEstanterias, recargar: recargarEstanterias } = usePolling(listarEstanterias);
+  const conEspacio = (estanterias ?? []).filter((e) => !estaLlena(e));
 
   // Solo para sugerir; la validación real del color la hace el backend.
   useEffect(() => {
     obtenerCatalogoColores().then(setCatalogoColores).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    listarEstanterias().then(setEstanterias).catch((err) => setErrorEstanterias(mensajeDeError(err)));
   }, []);
 
   const tipoTela = formulario.tipo_tela.trim();
@@ -47,17 +44,20 @@ export default function NuevoRolloModal({ onCerrar, onCreado }) {
     if (tipoTelaDebounced.length < 2) return undefined;
     let activo = true;
     listarRollos({ tipo_tela: tipoTelaDebounced })
-      .then((rollos) => { if (activo) setSugerencia({ tela: tipoTelaDebounced, estanteria: estanteriaMasUsada(rollos) }); })
+      .then((rollos) => { if (activo) setSugerencia({ tela: tipoTelaDebounced, usadas: estanteriasPorUso(rollos) }); })
       .catch(() => {}); // Es solo una sugerencia: sin ella se elige a mano.
     return () => { activo = false; };
   }, [tipoTelaDebounced]);
 
-  // La sugerencia solo aplica a la tela escrita y nunca pisa lo que el usuario eligió.
-  const estanteriaSugerida = sugerencia?.tela === tipoTela ? sugerencia.estanteria : '';
-  const estanteriaElegida = formulario.estanteria_id || estanteriaSugerida;
-  const codigoSugerido = estanteriaElegida === estanteriaSugerida
-    ? estanterias.find((e) => String(e.id) === estanteriaSugerida)?.codigo
-    : null;
+  // La sugerencia solo aplica a la tela escrita y se salta las estanterías llenas:
+  // la más usada con espacio o, si todas las de esa tela están llenas, otra con espacio.
+  const usadas = sugerencia?.tela === tipoTela ? sugerencia.usadas : [];
+  const usadaConEspacio = usadas.map((id) => conEspacio.find((e) => e.id === id)).find(Boolean);
+  const estanteriaSugerida = usadaConEspacio ?? (usadas.length > 0 ? conEspacio[0] : undefined);
+  // Nunca pisa lo elegido por el usuario, salvo que esa estantería se haya llenado.
+  const elegidaPorUsuario = conEspacio.some((e) => String(e.id) === formulario.estanteria_id) ? formulario.estanteria_id : '';
+  const estanteriaElegida = elegidaPorUsuario || String(estanteriaSugerida?.id ?? '');
+  const mostrarSugerencia = estanteriaSugerida && estanteriaElegida === String(estanteriaSugerida.id);
 
   const cambiar = (event) => setFormulario({ ...formulario, [event.target.name]: event.target.value });
 
@@ -77,6 +77,7 @@ export default function NuevoRolloModal({ onCerrar, onCreado }) {
     } catch (err) {
       setError(mensajeDeError(err));
     } finally {
+      recargarEstanterias();
       setEnviando(false);
     }
   };
@@ -120,9 +121,15 @@ export default function NuevoRolloModal({ onCerrar, onCreado }) {
         <label htmlFor="estanteria_id">Estantería</label>
         <select id="estanteria_id" name="estanteria_id" className="selector" value={estanteriaElegida} onChange={cambiar} required>
           <option value="" disabled>Selecciona una estantería</option>
-          {estanterias.map((e) => <option key={e.id} value={e.id}>{e.codigo}</option>)}
+          {estanterias?.map((e) => <option key={e.id} value={e.id} disabled={estaLlena(e)}>{etiquetaEstanteria(e)}</option>)}
         </select>
-        {codigoSugerido && <p className="tenue">Sugerida: ya hay rollos de {tipoTela} en {codigoSugerido}. Puedes cambiarla.</p>}
+        {mostrarSugerencia && (
+          <p className="tenue">
+            {usadaConEspacio
+              ? `Sugerida: ya hay rollos de ${tipoTela} en ${estanteriaSugerida.codigo}. Puedes cambiarla.`
+              : `Las estanterías con ${tipoTela} están llenas. Sugerida: ${estanteriaSugerida.codigo}. Puedes cambiarla.`}
+          </p>
+        )}
         <Alerta>{errorEstanterias}</Alerta>
 
         <Alerta>{error}</Alerta>
