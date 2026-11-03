@@ -106,6 +106,7 @@ export default function Operario() {
           <dl className="ficha-datos">
             <div><dt>Tipo de tela</dt><dd>{rollo.tipo_tela}</dd></div>
             <div><dt>Color</dt><dd>{rollo.color}</dd></div>
+            <div><dt>Ubicación</dt><dd>{rollo.estanteria_codigo ? `Estantería ${rollo.estanteria_codigo}` : 'Sin asignar'}</dd></div>
             <div><dt>Metraje inicial</dt><dd>{formatearMetros(rollo.metraje_inicial)}</dd></div>
             <div><dt>Disponible</dt><dd className="fuerte">{formatearMetros(rollo.metraje_actual)}</dd></div>
           </dl>

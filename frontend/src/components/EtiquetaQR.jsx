@@ -13,6 +13,7 @@ export default function EtiquetaQR({ rollo, qr }) {
           <div><dt>ID</dt><dd>#{rollo.id}</dd></div>
           <div><dt>Tela</dt><dd>{rollo.tipo_tela}</dd></div>
           <div><dt>Color</dt><dd>{rollo.color}</dd></div>
+          <div><dt>Ubicación</dt><dd>{rollo.estanteria_codigo ?? 'Sin asignar'}</dd></div>
           <div><dt>Metraje</dt><dd>{formatearMetros(rollo.metraje_inicial)}</dd></div>
           <div><dt>Ingreso</dt><dd>{formatearFecha(rollo.fecha_ingreso)}</dd></div>
         </dl>
