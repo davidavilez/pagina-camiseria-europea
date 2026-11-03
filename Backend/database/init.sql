@@ -33,6 +33,15 @@ CREATE TABLE IF NOT EXISTS usuarios (
 );
 
 -- ---------------------------------------------------------------------
+-- estanterias (ubicación física de los rollos en bodega)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS estanterias (
+  id           SERIAL PRIMARY KEY,
+  codigo       VARCHAR(20)  NOT NULL UNIQUE,
+  descripcion  VARCHAR(255)
+);
+
+-- ---------------------------------------------------------------------
 -- rollos
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS rollos (
@@ -47,6 +56,8 @@ CREATE TABLE IF NOT EXISTS rollos (
                    CONSTRAINT rollos_stock_minimo_check CHECK (stock_minimo >= 0),
   alerta_enviada   BOOLEAN       NOT NULL DEFAULT FALSE,
   fecha_ingreso    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  -- NULL significa "Sin asignar".
+  estanteria_id    INTEGER       REFERENCES estanterias(id) ON DELETE RESTRICT,
   -- Última línea de defensa de la regla de negocio: el saldo nunca es
   -- negativo ni supera lo que ingresó a bodega.
   CONSTRAINT rollos_metraje_actual_rango
@@ -69,6 +80,19 @@ CREATE INDEX IF NOT EXISTS idx_cortes_operario_id ON cortes (operario_id);
 CREATE INDEX IF NOT EXISTS idx_cortes_fecha_corte ON cortes (fecha_corte DESC);
 CREATE INDEX IF NOT EXISTS idx_rollos_color_lower     ON rollos (lower(color));
 CREATE INDEX IF NOT EXISTS idx_rollos_tipo_tela_lower ON rollos (lower(tipo_tela));
+-- El ALTER cubre `npm run db:init` sobre una BD anterior a esta columna: sin él, el índice fallaría.
+ALTER TABLE rollos ADD COLUMN IF NOT EXISTS estanteria_id INTEGER REFERENCES estanterias(id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS idx_rollos_estanteria_id   ON rollos (estanteria_id);
+
+-- ---------------------------------------------------------------------
+-- Seed: Estanterías de ejemplo
+-- ---------------------------------------------------------------------
+INSERT INTO estanterias (codigo, descripcion) VALUES
+  ('A-01', 'Pasillo A, estantería 1'),
+  ('A-02', 'Pasillo A, estantería 2'),
+  ('B-01', 'Pasillo B, estantería 1'),
+  ('B-02', 'Pasillo B, estantería 2')
+ON CONFLICT (codigo) DO NOTHING;
 
 -- ---------------------------------------------------------------------
 -- Seed: Gerente inicial
