@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
 CREATE TABLE IF NOT EXISTS estanterias (
   id           SERIAL PRIMARY KEY,
   codigo       VARCHAR(20)  NOT NULL UNIQUE,
-  descripcion  VARCHAR(255)
+  descripcion  VARCHAR(255),
+  capacidad    INTEGER      NOT NULL DEFAULT 60 CHECK (capacidad > 0)
 );
 
 -- ---------------------------------------------------------------------
