@@ -1,7 +1,7 @@
 import client from './client';
 
 /** Filtros acumulativos: solo se envían los que tienen valor. */
-const paramsDeFiltros = ({ search, buscar_por: buscarPor, color, tipo_tela: tipoTela } = {}) => {
+const paramsDeFiltros = ({ search, buscar_por: buscarPor, color, tipo_tela: tipoTela, estanteria_id: estanteria } = {}) => {
   const params = {};
   if (search) {
     params.search = search;
@@ -9,6 +9,7 @@ const paramsDeFiltros = ({ search, buscar_por: buscarPor, color, tipo_tela: tipo
   }
   if (color) params.color = color;
   if (tipoTela) params.tipo_tela = tipoTela;
+  if (estanteria) params.estanteria_id = estanteria;
   return params;
 };
 
@@ -29,5 +30,8 @@ export const obtenerRollo = (id) => client.get(`/rollos/${encodeURIComponent(id)
 export const crearRollo = (datos) => client.post('/rollos', datos).then((r) => r.data);
 
 export const reabastecerRollo = (id, metros) => client.patch(`/rollos/${id}/reabastecer`, { metros }).then((r) => r.data);
+
+/** `estanteriaId` null deja el rollo "Sin asignar". */
+export const cambiarUbicacionRollo = (id, estanteriaId) => client.patch(`/rollos/${id}/ubicacion`, { estanteria_id: estanteriaId }).then((r) => r.data);
 
 export const obtenerEtiqueta = (id) => client.get(`/rollos/${id}/etiqueta`).then((r) => r.data);

@@ -2,10 +2,24 @@ import { useEffect, useState } from 'react';
 import Modal from '../../components/Modal';
 import Alerta from '../../components/Alerta';
 import EtiquetaQR from '../../components/EtiquetaQR';
-import { crearRollo, obtenerCatalogoColores } from '../../api/rollos.api';
+import useDebounce from '../../hooks/useDebounce';
+import { crearRollo, listarRollos, obtenerCatalogoColores } from '../../api/rollos.api';
+import { listarEstanterias } from '../../api/estanterias.api';
 import { mensajeDeError } from '../../api/client';
 
-const FORMULARIO_VACIO = { codigo_sku: '', tipo_tela: '', color: '', metraje_inicial: '', stock_minimo: '20' };
+const FORMULARIO_VACIO = { codigo_sku: '', tipo_tela: '', color: '', metraje_inicial: '', stock_minimo: '20', estanteria_id: '' };
+
+/** Estantería con más rollos con saldo; en empate, la del rollo más reciente. */
+const estanteriaMasUsada = (rollos) => {
+  const conteo = new Map();
+  let mejor = '';
+  for (const { estanteria_id: id, metraje_actual: saldo } of rollos) {
+    if (id === null || saldo <= 0) continue;
+    conteo.set(id, (conteo.get(id) ?? 0) + 1);
+    if (mejor === '' || conteo.get(id) > conteo.get(Number(mejor))) mejor = String(id);
+  }
+  return mejor;
+};
 
 export default function NuevoRolloModal({ onCerrar, onCreado }) {
   const [formulario, setFormulario] = useState(FORMULARIO_VACIO);
@@ -13,11 +27,37 @@ export default function NuevoRolloModal({ onCerrar, onCreado }) {
   const [error, setError] = useState('');
   const [resultado, setResultado] = useState(null);
   const [catalogoColores, setCatalogoColores] = useState([]);
+  const [estanterias, setEstanterias] = useState([]);
+  const [errorEstanterias, setErrorEstanterias] = useState('');
+  const [sugerencia, setSugerencia] = useState(null);
 
   // Solo para sugerir; la validación real del color la hace el backend.
   useEffect(() => {
     obtenerCatalogoColores().then(setCatalogoColores).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    listarEstanterias().then(setEstanterias).catch((err) => setErrorEstanterias(mensajeDeError(err)));
+  }, []);
+
+  const tipoTela = formulario.tipo_tela.trim();
+  const tipoTelaDebounced = useDebounce(tipoTela);
+
+  useEffect(() => {
+    if (tipoTelaDebounced.length < 2) return undefined;
+    let activo = true;
+    listarRollos({ tipo_tela: tipoTelaDebounced })
+      .then((rollos) => { if (activo) setSugerencia({ tela: tipoTelaDebounced, estanteria: estanteriaMasUsada(rollos) }); })
+      .catch(() => {}); // Es solo una sugerencia: sin ella se elige a mano.
+    return () => { activo = false; };
+  }, [tipoTelaDebounced]);
+
+  // La sugerencia solo aplica a la tela escrita y nunca pisa lo que el usuario eligió.
+  const estanteriaSugerida = sugerencia?.tela === tipoTela ? sugerencia.estanteria : '';
+  const estanteriaElegida = formulario.estanteria_id || estanteriaSugerida;
+  const codigoSugerido = estanteriaElegida === estanteriaSugerida
+    ? estanterias.find((e) => String(e.id) === estanteriaSugerida)?.codigo
+    : null;
 
   const cambiar = (event) => setFormulario({ ...formulario, [event.target.name]: event.target.value });
 
@@ -30,6 +70,7 @@ export default function NuevoRolloModal({ onCerrar, onCreado }) {
         ...formulario,
         metraje_inicial: Number(formulario.metraje_inicial),
         stock_minimo: Number(formulario.stock_minimo),
+        estanteria_id: Number(estanteriaElegida),
       });
       setResultado(respuesta);
       onCreado();
@@ -75,6 +116,14 @@ export default function NuevoRolloModal({ onCerrar, onCreado }) {
 
         <label htmlFor="stock_minimo">Stock mínimo para alerta (m)</label>
         <input id="stock_minimo" name="stock_minimo" type="number" min="0" step="0.01" inputMode="decimal" value={formulario.stock_minimo} onChange={cambiar} required />
+
+        <label htmlFor="estanteria_id">Estantería</label>
+        <select id="estanteria_id" name="estanteria_id" className="selector" value={estanteriaElegida} onChange={cambiar} required>
+          <option value="" disabled>Selecciona una estantería</option>
+          {estanterias.map((e) => <option key={e.id} value={e.id}>{e.codigo}</option>)}
+        </select>
+        {codigoSugerido && <p className="tenue">Sugerida: ya hay rollos de {tipoTela} en {codigoSugerido}. Puedes cambiarla.</p>}
+        <Alerta>{errorEstanterias}</Alerta>
 
         <Alerta>{error}</Alerta>
 

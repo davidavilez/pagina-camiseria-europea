@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { FilterX, PackagePlus, Plus, QrCode, Search } from 'lucide-react';
+import { FilterX, MapPin, PackagePlus, Plus, QrCode, Search } from 'lucide-react';
 import usePolling from '../../hooks/usePolling';
 import useDebounce from '../../hooks/useDebounce';
 import { listarRollos, obtenerEtiqueta, obtenerOpcionesFiltro } from '../../api/rollos.api';
+import { listarEstanterias } from '../../api/estanterias.api';
 import { mensajeDeError } from '../../api/client';
 import StockBadge from '../../components/StockBadge';
 import Modal from '../../components/Modal';
@@ -11,6 +12,7 @@ import Alerta from '../../components/Alerta';
 import IndicadorEnVivo from '../../components/IndicadorEnVivo';
 import NuevoRolloModal from './NuevoRolloModal';
 import ReabastecerModal from './ReabastecerModal';
+import UbicacionModal from './UbicacionModal';
 import ResumenTela from './ResumenTela';
 import { ESTADOS_STOCK } from '../../utils/stock';
 import { formatearFecha, formatearMetros } from '../../utils/formato';
@@ -28,13 +30,14 @@ export default function InventarioTab() {
   const [buscarPor, setBuscarPor] = useState('tela');
   const [color, setColor] = useState('');
   const [tipoTela, setTipoTela] = useState('');
+  const [estanteria, setEstanteria] = useState('');
   const [filtroEstado, setFiltroEstado] = useState(null);
   const busquedaDebounced = useDebounce(busqueda.trim());
 
-  // Los filtros de texto, color y tela se resuelven en el backend (SQL dinámico).
+  // Los filtros de texto, color, tela y estantería se resuelven en el backend (SQL dinámico).
   const filtros = useMemo(
-    () => ({ search: busquedaDebounced, buscar_por: buscarPor, color, tipo_tela: tipoTela }),
-    [busquedaDebounced, buscarPor, color, tipoTela]
+    () => ({ search: busquedaDebounced, buscar_por: buscarPor, color, tipo_tela: tipoTela, estanteria_id: estanteria }),
+    [busquedaDebounced, buscarPor, color, tipoTela, estanteria]
   );
   // Buscar una tela (por texto o con el selector) muestra su panel de existencias.
   const buscandoTela = Boolean((buscarPor === 'tela' && busquedaDebounced) || tipoTela);
@@ -42,18 +45,21 @@ export default function InventarioTab() {
     () => listarRollos(filtros), undefined, JSON.stringify(filtros)
   );
   const { datos: opciones, recargar: recargarOpciones } = usePolling(obtenerOpcionesFiltro, OPCIONES_REFRESCO);
+  const { datos: estanterias } = usePolling(listarEstanterias, OPCIONES_REFRESCO);
 
   const [creando, setCreando] = useState(false);
   const [reabasteciendo, setReabasteciendo] = useState(null);
+  const [ubicando, setUbicando] = useState(null);
   const [etiqueta, setEtiqueta] = useState(null);
   const [errorEtiqueta, setErrorEtiqueta] = useState('');
 
-  const hayFiltros = Boolean(busqueda || color || tipoTela || filtroEstado);
+  const hayFiltros = Boolean(busqueda || color || tipoTela || estanteria || filtroEstado);
 
   const limpiarFiltros = () => {
     setBusqueda('');
     setColor('');
     setTipoTela('');
+    setEstanteria('');
     setFiltroEstado(null);
   };
 
@@ -124,6 +130,11 @@ export default function InventarioTab() {
           <option value="">Todas las telas</option>
           {opciones?.tipos_tela.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
+        <select className="selector" aria-label="Filtrar por estantería" value={estanteria} onChange={(e) => setEstanteria(e.target.value)}>
+          <option value="">Todas las ubicaciones</option>
+          <option value="sin_asignar">Sin asignar</option>
+          {estanterias?.map((e) => <option key={e.id} value={e.id}>{e.codigo}</option>)}
+        </select>
         <button type="button" className="btn btn--secundario" onClick={limpiarFiltros} disabled={!hayFiltros}>
           <FilterX size={16} /> Limpiar filtros
         </button>
@@ -149,6 +160,7 @@ export default function InventarioTab() {
                 <th>Código/SKU</th>
                 <th>Tela</th>
                 <th>Color</th>
+                <th>Ubicación</th>
                 <th className="num">Inicial</th>
                 <th className="num">Actual</th>
                 <th className="num">Mínimo</th>
@@ -164,12 +176,16 @@ export default function InventarioTab() {
                   <td data-label="Código/SKU" className="fuerte">{rollo.codigo_sku}</td>
                   <td data-label="Tela">{rollo.tipo_tela}</td>
                   <td data-label="Color">{rollo.color}</td>
+                  <td data-label="Ubicación" className={rollo.estanteria_codigo ? 'fuerte' : 'tenue'}>{rollo.estanteria_codigo ?? 'Sin asignar'}</td>
                   <td data-label="Inicial" className="num">{formatearMetros(rollo.metraje_inicial)}</td>
                   <td data-label="Actual" className="num fuerte">{formatearMetros(rollo.metraje_actual)}</td>
                   <td data-label="Mínimo" className="num tenue">{formatearMetros(rollo.stock_minimo)}</td>
                   <td data-label="Estado"><StockBadge estado={rollo.estado_stock} /></td>
                   <td data-label="Ingreso" className="tenue">{formatearFecha(rollo.fecha_ingreso)}</td>
                   <td className="acciones">
+                    <button type="button" className="btn-icono" title="Cambiar ubicación" aria-label={`Cambiar ubicación de ${rollo.codigo_sku}`} onClick={() => setUbicando(rollo)}>
+                      <MapPin size={18} />
+                    </button>
                     <button type="button" className="btn-icono" title="Reabastecer" aria-label={`Reabastecer ${rollo.codigo_sku}`} onClick={() => setReabasteciendo(rollo)}>
                       <PackagePlus size={18} />
                     </button>
@@ -180,7 +196,7 @@ export default function InventarioTab() {
                 </tr>
               ))}
               {visibles.length === 0 && (
-                <tr><td colSpan={10} className="vacio">{hayFiltros ? 'Ningún rollo coincide con los filtros.' : 'Aún no hay rollos registrados. Usa "Agregar Rollo".'}</td></tr>
+                <tr><td colSpan={11} className="vacio">{hayFiltros ? 'Ningún rollo coincide con los filtros.' : 'Aún no hay rollos registrados. Usa "Agregar Rollo".'}</td></tr>
               )}
             </tbody>
           </table>
@@ -189,6 +205,7 @@ export default function InventarioTab() {
 
       {creando && <NuevoRolloModal onCerrar={() => setCreando(false)} onCreado={alCrear} />}
       {reabasteciendo && <ReabastecerModal rollo={reabasteciendo} onCerrar={() => setReabasteciendo(null)} onReabastecido={recargar} />}
+      {ubicando && <UbicacionModal rollo={ubicando} estanterias={estanterias ?? []} onCerrar={() => setUbicando(null)} onReubicado={recargar} />}
       {etiqueta && (
         <Modal titulo={`Etiqueta del rollo ${etiqueta.rollo.codigo_sku}`} onCerrar={() => setEtiqueta(null)}>
           <EtiquetaQR rollo={etiqueta.rollo} qr={etiqueta.qr} />
