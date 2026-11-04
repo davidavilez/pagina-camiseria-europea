@@ -1,4 +1,7 @@
-version: '3.8'
+# Despliegue completo: base de datos + API + frontend (Nginx).
+#   1. cp .env.example .env   (y completar los valores)
+#   2. docker compose up -d --build
+# La app queda en http://<IP-del-servidor> (puerto 80).
 
 services:
   db:
@@ -6,15 +9,58 @@ services:
     container_name: camiseria_postgres
     restart: always
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password123
-      POSTGRES_DB: inventario_telas
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+      POSTGRES_DB: ${DB_NAME:-inventario_telas}
+    # Solo accesible desde la propia máquina (desarrollo local con `npm run dev`);
+    # nunca expuesto a internet.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       # Solo se ejecuta cuando el volumen está vacío (primera instalación).
       - ./Backend/database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./Backend
+    container_name: camiseria_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-admin}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-inventario_telas}
+      # Nginx sirve la página y reenvía /api: ambos enlaces de los correos usan la URL pública.
+      CORS_ORIGIN: ${PUBLIC_URL:?Falta PUBLIC_URL en .env}
+      API_URL: ${PUBLIC_URL}
+      FRONTEND_URL: ${PUBLIC_URL}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-}
+      ALERTAS_STOCK_EMAIL: ${ALERTAS_STOCK_EMAIL:-}
+
+  frontend:
+    build: ./frontend
+    container_name: camiseria_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "${HTTP_PORT:-80}:80"
 
 volumes:
   pgdata:
