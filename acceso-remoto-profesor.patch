@@ -1,0 +1,124 @@
+From b25a6c15d4d2a7b72c14e13be5bbd792d9620a1b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 30 Oct 2026 03:21:39 +0000
+Subject: [PATCH] =?UTF-8?q?Habilitar=20acceso=20remoto=20temporal=20para?=
+ =?UTF-8?q?=20la=20presentaci=C3=B3n=20(t=C3=BAnel=20Cloudflare)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Vite: allowedHosts: true, strictPort y puerto fijo 5173; mismo
+  ajuste y proxy /api en preview. Un solo túnel expone el frontend
+  y /api se reenvía al backend en localhost:3000.
+- Express: CORS temporal con origin '*' (marcado para revertir).
+- .gitignore: ignorar .env en la raíz y en frontend.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019J5Yor5bSMkcW9Met14ows
+---
+ .gitignore              |  4 ++++
+ Backend/src/app.js      |  6 ++++--
+ frontend/.gitignore     |  3 +++
+ frontend/vite.config.js | 31 +++++++++++++++++++++++--------
+ 4 files changed, 34 insertions(+), 10 deletions(-)
+ create mode 100644 .gitignore
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..5cecbc4
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,4 @@
++node_modules/
++.env
++.env.*
++!.env.example
+diff --git a/Backend/src/app.js b/Backend/src/app.js
+index 6b23af6..24c1bcb 100644
+--- a/Backend/src/app.js
++++ b/Backend/src/app.js
+@@ -1,13 +1,15 @@
+ const express = require('express');
+ const cors = require('cors');
+-const { corsOrigin } = require('./config/env');
++// const { corsOrigin } = require('./config/env');
+ const apiRoutes = require('./routes');
+ const { rutaNoEncontrada, manejadorErrores } = require('./middlewares/error.middleware');
+ 
+ const app = express();
+ 
+ app.disable('x-powered-by');
+-app.use(cors({ origin: corsOrigin.split(',').map((origen) => origen.trim()) }));
++// TEMPORAL: presentación remota, revertir después (restaurar la línea comentada y el require de corsOrigin).
++// app.use(cors({ origin: corsOrigin.split(',').map((origen) => origen.trim()) }));
++app.use(cors({ origin: '*' }));
+ app.use(express.json({ limit: '100kb' }));
+ 
+ app.get('/api/health', (req, res) => res.json({ estado: 'ok' }));
+diff --git a/frontend/.gitignore b/frontend/.gitignore
+index a547bf3..5f47958 100644
+--- a/frontend/.gitignore
++++ b/frontend/.gitignore
+@@ -22,3 +22,6 @@ dist-ssr
+ *.njsproj
+ *.sln
+ *.sw?
++.env
++.env.*
++!.env.example
+diff --git a/frontend/vite.config.js b/frontend/vite.config.js
+index 7c31c30..41cd3cd 100644
+--- a/frontend/vite.config.js
++++ b/frontend/vite.config.js
+@@ -2,25 +2,40 @@ import { defineConfig } from 'vite'
+ import react from '@vitejs/plugin-react'
+ import basicSsl from '@vitejs/plugin-basic-ssl'
+ 
++// Reenvía /api al backend: el navegador solo habla con Vite (mismo origen),
++// así el backend puede seguir en HTTP aunque la página se sirva en HTTPS y,
++// con un túnel, basta exponer el puerto del frontend.
++const proxy = {
++  '/api': 'http://localhost:3000',
++}
++
+ // https://vite.dev/config/
+ export default defineConfig(({ mode }) => ({
+   plugins: [
+     react(),
+     // HTTPS con certificado autofirmado (por defecto). Los navegadores solo
+     // permiten la cámara en HTTPS o localhost, así que el celular lo necesita
+-    // para escanear QR (https://<IP-del-PC>:5173). `npm run dev:http` lo desactiva.
++    // para escanear QR (https://<IP-del-PC>:5173). `npm run dev:http` lo desactiva
++    // (necesario con el túnel de Cloudflare, que ya entrega HTTPS).
+     ...(mode === 'http' ? [] : [basicSsl()]),
+   ],
+   server: {
++    port: 5173,
++    // Si el 5173 está ocupado falla en vez de cambiar de puerto (el túnel apunta a 5173).
++    strictPort: true,
+     // Escucha en todas las interfaces: permite abrir la app desde el celular
+     // en la misma red Wi-Fi.
+     host: true,
+-    // Dominios de túneles (ngrok / localtunnel) para pruebas fuera de la red local.
+-    allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.app', '.loca.lt'],
+-    // Reenvía /api al backend: el navegador solo habla con Vite (mismo origen),
+-    // así el backend puede seguir en HTTP aunque la página se sirva en HTTPS.
+-    proxy: {
+-      '/api': 'http://localhost:3000',
+-    },
++    // TEMPORAL: presentación remota, revertir después. Acepta cualquier Host
++    // (dominios aleatorios *.trycloudflare.com del túnel).
++    allowedHosts: true,
++    proxy,
++  },
++  preview: {
++    port: 4173,
++    strictPort: true,
++    host: true,
++    allowedHosts: true,
++    proxy,
+   },
+ }))
+-- 
+2.43.0
+
