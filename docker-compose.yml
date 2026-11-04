@@ -62,5 +62,26 @@ services:
     ports:
       - "${HTTP_PORT:-80}:80"
 
+  # Solo con COMPOSE_PROFILES=https en el .env: HTTPS con Caddy en los puertos 80 y 443.
+  # (El navegador del celular exige HTTPS para usar la cámara del escáner QR.)
+  https:
+    image: caddy:2-alpine
+    container_name: camiseria_https
+    profiles: ["https"]
+    restart: always
+    depends_on:
+      - frontend
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:
