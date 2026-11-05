@@ -1,24 +1,50 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import Operario from './Operario';
-import Gerencia from './Gerencia';
+import { Suspense, lazy } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import AuthProvider from './context/AuthProvider';
+import useAuth from './hooks/useAuth';
+import Navbar from './components/Navbar';
+import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
+import Login from './pages/Login';
+import { rutaInicioPorRol } from './utils/rutas';
 
-function App() {
+// Cada rol descarga solo su vista (el escáner QR es pesado).
+const Gerencia = lazy(() => import('./pages/gerencia/Gerencia'));
+const Operario = lazy(() => import('./pages/operario/Operario'));
+
+function Rutas() {
+  const { usuario, autenticado, cerrarSesion } = useAuth();
+  const { pathname } = useLocation();
+  const inicio = autenticado ? rutaInicioPorRol(usuario.rol) : '/login';
+
   return (
-    <BrowserRouter>
-      <nav className="navbar">
-        <Link to="/" className="nav-link">Inicio</Link>
-        <Link to="/escaner" className="nav-link">Operario (Escáner)</Link>
-        <Link to="/dashboard" className="nav-link">Gerencia (Dashboard)</Link>
-      </nav>
-
-      <Routes>
-        <Route path="/" element={<h2 className="titulo-principal" style={{marginTop: '50px'}}>Sistema de Inventario QR</h2>} />
-        <Route path="/escaner" element={<Operario />} />
-        <Route path="/dashboard" element={<Gerencia />} />
-      </Routes>
-    </BrowserRouter>
+    <>
+      <Navbar />
+      {/* key: al navegar a otra ruta se descarta el error anterior. */}
+      <ErrorBoundary key={pathname} onCerrarSesion={autenticado ? cerrarSesion : null}>
+        <Suspense fallback={<p className="vacio">Cargando...</p>}>
+          <Routes>
+            <Route path="/login" element={autenticado ? <Navigate to={inicio} replace /> : <Login />} />
+            <Route element={<ProtectedRoute permiso="rollos:listar" />}>
+              <Route path="/gerencia" element={<Gerencia />} />
+            </Route>
+            <Route element={<ProtectedRoute permiso="cortes:registrar" />}>
+              <Route path="/operario" element={<Operario />} />
+            </Route>
+            <Route path="*" element={<Navigate to={inicio} replace />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
+    </>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Rutas />
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}

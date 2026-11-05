@@ -1,0 +1,113 @@
+-- =====================================================================
+-- APP-INV-QR-CE-01 · Camisería Europea
+-- Script de inicialización de base de datos (PostgreSQL 15+)
+--
+-- Uso (instalación limpia):
+--   docker exec -i camiseria_postgres psql -U admin -d inventario_telas < Backend/database/init.sql
+--
+-- Es idempotente: puede ejecutarse varias veces sin duplicar datos.
+-- NOTA: si la BD ya tiene tablas con el esquema antiguo (codigo_qr,
+-- operario_id VARCHAR, creado_en), CREATE TABLE IF NOT EXISTS no las
+-- modificará. En ese caso se debe aplicar la migración correspondiente
+-- (npm run db:migrate aplica database/migrations/*.sql).
+-- =====================================================================
+
+BEGIN;
+
+-- ---------------------------------------------------------------------
+-- usuarios
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS usuarios (
+  id              SERIAL PRIMARY KEY,
+  nombre          VARCHAR(120) NOT NULL CHECK (char_length(trim(nombre)) >= 2),
+  email           VARCHAR(254) NOT NULL UNIQUE CHECK (email = lower(email)),
+  password_hash   TEXT         NOT NULL,
+  rol             VARCHAR(20)  NOT NULL CHECK (rol IN ('gerencia', 'operario')),
+  -- Toda cuenta nueva nace bloqueada hasta que el Súper Administrador la apruebe.
+  estado          VARCHAR(25)  NOT NULL DEFAULT 'pendiente_aprobacion'
+                  CONSTRAINT usuarios_estado_check
+                  CHECK (estado IN ('pendiente_aprobacion', 'activo', 'inactivo')),
+  aprobacion_token          VARCHAR(64) UNIQUE,
+  aprobacion_notificada_en  TIMESTAMPTZ,
+  fecha_creacion  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------------------------------------------------
+-- estanterias (ubicación física de los rollos en bodega)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS estanterias (
+  id           SERIAL PRIMARY KEY,
+  codigo       VARCHAR(20)  NOT NULL UNIQUE,
+  descripcion  VARCHAR(255),
+  capacidad    INTEGER      NOT NULL DEFAULT 60 CHECK (capacidad > 0)
+);
+
+-- ---------------------------------------------------------------------
+-- rollos
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS rollos (
+  id               SERIAL PRIMARY KEY,
+  codigo_sku       VARCHAR(50)   NOT NULL UNIQUE,
+  tipo_tela        VARCHAR(80)   NOT NULL,
+  color            VARCHAR(50)   NOT NULL,
+  metraje_inicial  NUMERIC(10,2) NOT NULL CHECK (metraje_inicial > 0),
+  metraje_actual   NUMERIC(10,2) NOT NULL,
+  -- DSS: al caer a este saldo se envía una alerta (una sola vez) a gerencia.
+  stock_minimo     NUMERIC(10,2) NOT NULL DEFAULT 20
+                   CONSTRAINT rollos_stock_minimo_check CHECK (stock_minimo >= 0),
+  alerta_enviada   BOOLEAN       NOT NULL DEFAULT FALSE,
+  fecha_ingreso    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  -- NULL significa "Sin asignar".
+  estanteria_id    INTEGER       REFERENCES estanterias(id) ON DELETE RESTRICT,
+  -- Última línea de defensa de la regla de negocio: el saldo nunca es
+  -- negativo ni supera lo que ingresó a bodega.
+  CONSTRAINT rollos_metraje_actual_rango
+    CHECK (metraje_actual >= 0 AND metraje_actual <= metraje_inicial)
+);
+
+-- ---------------------------------------------------------------------
+-- cortes (historial / trazabilidad)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cortes (
+  id               SERIAL PRIMARY KEY,
+  rollo_id         INTEGER       NOT NULL REFERENCES rollos(id)   ON DELETE RESTRICT,
+  operario_id      INTEGER       NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+  metros_cortados  NUMERIC(10,2) NOT NULL CHECK (metros_cortados > 0),
+  fecha_corte      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cortes_rollo_id    ON cortes (rollo_id);
+CREATE INDEX IF NOT EXISTS idx_cortes_operario_id ON cortes (operario_id);
+CREATE INDEX IF NOT EXISTS idx_cortes_fecha_corte ON cortes (fecha_corte DESC);
+CREATE INDEX IF NOT EXISTS idx_rollos_color_lower     ON rollos (lower(color));
+CREATE INDEX IF NOT EXISTS idx_rollos_tipo_tela_lower ON rollos (lower(tipo_tela));
+-- El ALTER cubre `npm run db:init` sobre una BD anterior a esta columna: sin él, el índice fallaría.
+ALTER TABLE rollos ADD COLUMN IF NOT EXISTS estanteria_id INTEGER REFERENCES estanterias(id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS idx_rollos_estanteria_id   ON rollos (estanteria_id);
+
+-- ---------------------------------------------------------------------
+-- Seed: Estanterías de ejemplo
+-- ---------------------------------------------------------------------
+INSERT INTO estanterias (codigo, descripcion) VALUES
+  ('A-01', 'Pasillo A, estantería 1'),
+  ('A-02', 'Pasillo A, estantería 2'),
+  ('B-01', 'Pasillo B, estantería 1'),
+  ('B-02', 'Pasillo B, estantería 2')
+ON CONFLICT (codigo) DO NOTHING;
+
+-- ---------------------------------------------------------------------
+-- Seed: Gerente inicial
+--   email:      gerente@camiseriaeuropea.com
+--   contraseña: Gerente#2026   (bcrypt, cost 12)  -> CAMBIAR tras el primer ingreso
+-- ---------------------------------------------------------------------
+INSERT INTO usuarios (nombre, email, password_hash, rol, estado)
+VALUES (
+  'Gerente General',
+  'gerente@camiseriaeuropea.com',
+  '$2b$12$htOHCts90aPJQWJWpnfX9uPaWi3K0ohw3MEJ3mfYN62oEmPmBUtrq',
+  'gerencia',
+  'activo'
+)
+ON CONFLICT (email) DO NOTHING;
+
+COMMIT;
